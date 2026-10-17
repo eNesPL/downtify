@@ -26,6 +26,7 @@ import AppIcon from '../ui/AppIcon.vue'
 import { useI18n } from '/src/i18n'
 
 const props = defineProps({
+  sourceUrl: { type: String, default: '' },
   artist: { type: String, default: '' },
   title: { type: String, default: '' },
   filled: { type: Boolean, default: false },
@@ -38,6 +39,25 @@ function go() {
   const artist = String(props.artist || '').trim()
   const title = String(props.title || '').trim()
   if (!artist || !title) return
-  router.push({ name: 'Similar', query: { artist, track: title } })
+  let url = ''
+  try {
+    const parsed = new URL(props.sourceUrl)
+    if (
+      [
+        'youtube.com',
+        'www.youtube.com',
+        'music.youtube.com',
+        'm.youtube.com',
+        'youtu.be',
+      ].includes(parsed.hostname)
+    )
+      url = parsed.href
+  } catch {
+    /* Ordinary search results may have no source URL. */
+  }
+  router.push({
+    name: 'Similar',
+    query: { artist, track: title, ...(url ? { url } : {}) },
+  })
 }
 </script>

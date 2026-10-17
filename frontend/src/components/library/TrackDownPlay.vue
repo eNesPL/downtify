@@ -129,7 +129,12 @@
       @click.stop
       @dblclick.stop
     >
-      <SimilarButton :artist="firstArtist" :title="song.name" filled />
+      <SimilarButton
+        :source-url="song.url"
+        :artist="firstArtist"
+        :title="song.name"
+        filled
+      />
       <DownloadState :song="song" />
     </div>
   </div>

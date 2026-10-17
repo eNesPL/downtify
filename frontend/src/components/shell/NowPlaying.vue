@@ -509,7 +509,19 @@ function goSimilar() {
   ).trim()
   const title = (track.value?.name || track.value?.title || '').trim()
   if (!artist || !title) return
-  router.push({ name: 'Similar', query: { artist, track: title } })
+  router.push({
+    name: 'Similar',
+    query: {
+      artist,
+      track: title,
+      file: track.value?.file || '',
+      url: track.value?.file
+        ? ''
+        : track.value?.video_id
+          ? `https://www.youtube.com/watch?v=${track.value.video_id}`
+          : '',
+    },
+  })
 }
 const palette = useCoverPalette(track)
 const tint = computed(

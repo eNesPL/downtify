@@ -1,4 +1,7 @@
+import recognition from '../recognition.js'
+
 export default {
+  recognition,
   language: {
     name: 'Magyar',
   },

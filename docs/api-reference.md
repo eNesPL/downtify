@@ -2730,3 +2730,11 @@ When an app is paired, the web page showing the code learns it at once:
 { "type": "device_paired", "pairing_id": "rfLmICXqGfRBXyXl", "device": { "id": "8uz4d35zjpn2", "name": "Pixel 8", "platform": "android", "…": "…" } }
 ```
 
+
+## AMV recognition and approved song identities
+
+The authenticated `/api/music/` routes recognize an AMV or local file, retain
+its original source, and use an explicitly approved identity for recommendations.
+See [AMV recognition API](features/amv-recognition.md#api) for request and response
+shapes, job states, provider configuration, library scanning and reversible
+administrator tag correction. Existing similar-track endpoints are unchanged.
