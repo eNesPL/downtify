@@ -55,6 +55,20 @@ export default {
   openSource: 'Open original AMV',
   reviewHint:
     'Review the suggestions or enter the artist and song manually. Text search is a suggestion, not an audio identification. Saving preserves the audio, file tags and playlists.',
+  compareTitle: 'Compare recordings before saving',
+  compareHint:
+    'Listen to the AMV and each suggested recording. Switching playback stops the previous recording. A suggestion is not a verified original.',
+  listenSource: 'Listen to source AMV / file',
+  listenCandidate: 'Listen to this candidate',
+  listenEntered: 'Listen to the entered artist and title',
+  pausePreview: 'Pause preview',
+  loadingPreview: 'Loading audio…',
+  seekPreview: 'Seek in this recording',
+  previewFailed:
+    'Could not play this recording. Try again or open it on YouTube.',
+  openRecording: 'Open this recording on YouTube',
+  searchPreviewHint:
+    'No recording link was provided. Playback searches YouTube by artist and title; verify the version you hear.',
   accept: 'Save song identity',
   reject: 'Reject / remove identity',
   recent: 'Recent recognitions',

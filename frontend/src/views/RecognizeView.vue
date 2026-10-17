@@ -77,6 +77,16 @@
           >{{ t('recognition.openSource') }}</a
         >
       </div>
+      <div class="flex flex-col gap-2 rounded-control border border-line-2 p-3">
+        <h3 class="text-sm font-semibold">
+          {{ t('recognition.compareTitle') }}
+        </h3>
+        <p class="text-xs text-muted">{{ t('recognition.compareHint') }}</p>
+        <RecognitionPreview
+          :track="sourcePreview"
+          :label="t('recognition.listenSource')"
+        />
+      </div>
       <p class="text-sm font-semibold">
         {{ t(`recognition.status.${job.status}`) }}
       </p>
@@ -113,12 +123,28 @@
                 (item.methods || [item.method]).map(methodLabel).join(' · ')
               }}</span>
             </button>
+            <div class="px-3 py-2">
+              <RecognitionPreview
+                :track="candidatePreview(item, index)"
+                :label="t('recognition.listenCandidate')"
+              />
+              <p v-if="!item.video_id" class="mt-1 text-xs text-muted">
+                {{ t('recognition.searchPreviewHint') }}
+              </p>
+            </div>
           </li>
         </ul>
         <div class="grid gap-3 sm:grid-cols-2">
           <UiInput v-model.trim="artist" :label="t('similar.artist')" />
           <UiInput v-model.trim="title" :label="t('similar.track')" />
         </div>
+        <RecognitionPreview
+          v-if="artist && title && selected === null"
+          :track="
+            candidatePreview({ artist, title }, `manual:${artist}|${title}`)
+          "
+          :label="t('recognition.listenEntered')"
+        />
         <div class="flex flex-wrap gap-2">
           <UiButton
             :disabled="busy || !artist || !title"
@@ -200,6 +226,11 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '/src/components/library/PageHeader.vue'
+import RecognitionPreview from '/src/components/library/RecognitionPreview.vue'
+import {
+  recognitionSourceTrack,
+  recognitionCandidateTrack,
+} from '/src/model/recognitionPreview'
 import UiButton from '/src/components/ui/UiButton.vue'
 import UiInput from '/src/components/ui/UiInput.vue'
 import UiProgress from '/src/components/ui/UiProgress.vue'
@@ -225,6 +256,10 @@ const scanMessage = ref('')
 const sourceFile = computed(() =>
   String(route.query.file || job.value?.source.file || '')
 )
+const sourcePreview = computed(() => recognitionSourceTrack(job.value))
+function candidatePreview(item, key) {
+  return recognitionCandidateTrack(job.value?.id, item, key)
+}
 const active = computed(() => ['queued', 'running'].includes(job.value?.status))
 const audioAvailable = computed(
   () => available.value.audd || (sourceFile.value && available.value.acoustid)
