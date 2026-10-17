@@ -105,6 +105,11 @@ const routes = [
     component: () => import('/src/views/SimilarView.vue'),
   },
   {
+    path: '/recognize',
+    name: 'Recognize',
+    component: () => import('/src/views/RecognizeView.vue'),
+  },
+  {
     path: '/settings/:section?',
     name: 'Settings',
     component: () => import('/src/views/SettingsView.vue'),

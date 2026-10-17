@@ -212,3 +212,12 @@ Podcast episodes: `PUT /api/podcasts/episodes/{id}/playback` with `{ "position_s
 | `429` | Rate-limited (pairing) — wait `Retry-After` seconds |
 | `499` | The server stopped a transcode because the client disconnected (you won't normally see it) |
 | `501` | Transcoding requested but the server has no ffmpeg — use `format=original` |
+
+## Optional AMV recognition extension
+
+Servers may expose `/api/music/recognition/capabilities`. A paired app can use
+the [AMV recognition API](features/amv-recognition.md#api) to submit sources,
+poll jobs, approve identities, scan owned library files and request similar
+tracks based on the approved musician. These additive routes are outside v1;
+treat 404 as an older server without this extension. Shared file tag writes
+remain administrator-only.

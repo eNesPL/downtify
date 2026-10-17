@@ -235,7 +235,19 @@ function goSimilar() {
   const artist = (track.value?.artists || [])[0] || track.value?.artist || ''
   const title = track.value?.name || track.value?.title || ''
   if (!artist.trim() || !title.trim()) return
-  router.push({ name: 'Similar', query: { artist, track: title } })
+  router.push({
+    name: 'Similar',
+    query: {
+      artist,
+      track: title,
+      file: track.value?.file || '',
+      url: track.value?.file
+        ? ''
+        : track.value?.video_id
+          ? `https://www.youtube.com/watch?v=${track.value.video_id}`
+          : '',
+    },
+  })
 }
 
 // A stream that isn't in the library yet can be queued from here; while

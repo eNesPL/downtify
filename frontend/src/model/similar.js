@@ -11,6 +11,9 @@ const tracks = ref([])
 const loading = ref(false)
 const error = ref('')
 const searched = ref(false)
+const recognition = ref(null)
+let sourceKey = ''
+let source = {}
 // The endless list: the radio mix is finite per request, so pages are
 // chained by seeding each request from the last row.
 const hasMore = ref(true)
@@ -33,27 +36,42 @@ function songKey(item) {
   return `${a}|${n}`
 }
 
-async function searchFor(seedArtist, seedTrack) {
+async function searchFor(seedArtist, seedTrack, seedSource = {}) {
+  source = seedSource
+  sourceKey = JSON.stringify({
+    file: seedSource.file || '',
+    url: seedSource.url || '',
+  })
   const a = String(seedArtist || '').trim()
   const t = String(seedTrack || '').trim()
+  const mine = ++serial
+  recognition.value = null
   artist.value = a
   track.value = t
   if (!a && !t) {
     tracks.value = []
+    loading.value = false
+    loadingMore.value = false
+    error.value = ''
     searched.value = false
     hasMore.value = true
     return
   }
-  const mine = ++serial
   loading.value = true
   loadingMore.value = false
   hasMore.value = true
   error.value = ''
   searched.value = true
   try {
-    const res = await API.getSimilarTracks(a, t)
+    const res =
+      source.file || source.url
+        ? await API.getSimilarTracks(a, t, 20, source)
+        : await API.getSimilarTracks(a, t)
     if (mine !== serial) return
     tracks.value = res.data?.tracks || []
+    recognition.value = res.data?.recognition || null
+    artist.value = res.data?.artist || a
+    track.value = res.data?.track || t
   } catch (err) {
     if (mine !== serial) return
     tracks.value = []
@@ -113,6 +131,9 @@ function clear() {
   hasMore.value = true
   error.value = ''
   searched.value = false
+  recognition.value = null
+  source = {}
+  sourceKey = ''
 }
 
 export function useSimilar() {
@@ -146,6 +167,10 @@ export function useSimilar() {
     hasMore,
     error,
     searched,
+    recognition,
+    matchesSource: (value) =>
+      sourceKey ===
+      JSON.stringify({ file: value.file || '', url: value.url || '' }),
     searchFor,
     loadMore,
     clear,

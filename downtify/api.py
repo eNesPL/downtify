@@ -460,6 +460,7 @@ from .podcasts import (
     resolve_spotify_podcast,
     search_shows,
 )
+from .recognition_store import RecognitionStore
 from .server_identity import ServerIdentity
 from .slskd_provider import reset_slskd_parallelism
 from .stream import StreamCache
@@ -988,6 +989,8 @@ class ConnectionManager:
 
 
 class AppState:
+    recognition: Optional[RecognitionStore] = None
+    recognition_semaphore: Optional[asyncio.Semaphore] = None
     version: str = '0.0.0'
     downloader: Optional[Downloader] = None
     connections: ConnectionManager = ConnectionManager()

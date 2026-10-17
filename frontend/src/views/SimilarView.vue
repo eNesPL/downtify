@@ -4,6 +4,31 @@
   >
     <PageHeader :title="t('similar.title')" :subtitle="t('similar.subtitle')" />
 
+    <div
+      class="flex flex-wrap items-center gap-3 rounded-panel border border-line-2 bg-surface p-4"
+    >
+      <p class="flex-1 text-sm text-muted">
+        {{
+          similar.recognition.value
+            ? t('recognition.usingOriginal', {
+                artist: similar.artist.value,
+                title: similar.track.value,
+              })
+            : t('recognition.similarHint')
+        }}
+      </p>
+      <UiButton
+        icon="search"
+        @click="
+          router.push({
+            name: 'Recognize',
+            query: { file: route.query.file || '', url: route.query.url || '' },
+          })
+        "
+        >{{ t('recognition.menu') }}</UiButton
+      >
+    </div>
+
     <!-- No search button: Enter (like the main search) starts the mix. -->
     <form
       class="flex flex-col gap-2 sm:flex-row sm:items-end"
@@ -140,17 +165,34 @@ function applyQuery() {
   const artist = String(route.query.artist || '').trim()
   const track = String(route.query.track || '').trim()
   if (!artist && !track) return
-  if (artist === similar.artist.value && track === similar.track.value) {
+  const source = {
+    file: String(route.query.file || ''),
+    url: String(route.query.url || ''),
+  }
+  if (
+    artist === similar.artist.value &&
+    track === similar.track.value &&
+    similar.matchesSource(source)
+  ) {
     return
   }
   artistInput.value = artist
   trackInput.value = track
-  similar.searchFor(artist, track)
+  similar.searchFor(artist, track, source)
 }
 
-watch(() => [route.query.artist, route.query.track], applyQuery, {
-  immediate: true,
-})
+watch(
+  () => [
+    route.query.artist,
+    route.query.track,
+    route.query.file,
+    route.query.url,
+  ],
+  applyQuery,
+  {
+    immediate: true,
+  }
+)
 
 const resultsTitle = computed(() => {
   const a = similar.artist.value
@@ -167,12 +209,16 @@ function submit() {
   if (!artist && !track) return
   // Keep the URL shareable; the watcher above ignores it when it matches
   // what's already searched.
+  const source = {}
   router.replace({ name: 'Similar', query: { artist, track } })
-  similar.searchFor(artist, track)
+  similar.searchFor(artist, track, source)
 }
 
 function retry() {
-  similar.searchFor(similar.artist.value, similar.track.value)
+  similar.searchFor(similar.artist.value, similar.track.value, {
+    file: String(route.query.file || ''),
+    url: String(route.query.url || ''),
+  })
 }
 
 // Scrolling to the list end loads the next page, endlessly.

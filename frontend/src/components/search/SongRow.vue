@@ -75,7 +75,12 @@
       <AppIcon name="arrow-up-right" :size="16" />
     </a>
     <div class="flex w-40 shrink-0 items-center justify-end gap-2">
-      <SimilarButton :artist="firstArtist" :title="song.name" filled />
+      <SimilarButton
+        :source-url="song.url"
+        :artist="firstArtist"
+        :title="song.name"
+        filled
+      />
       <DownloadState :song="song" />
     </div>
   </div>

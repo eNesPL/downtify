@@ -102,6 +102,7 @@
           </UiBadge>
         </div>
         <SimilarButton
+          :source-url="row.song.url"
           :artist="(row.song.artists || [])[0] || row.song.artist || ''"
           :title="row.song.name"
         />

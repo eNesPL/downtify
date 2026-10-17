@@ -130,3 +130,34 @@ describe('useSimilar', () => {
     expect(similar.songs.value).toHaveLength(1)
   })
 })
+
+describe('approved AMV identity', () => {
+  it('passes the library source and displays the resolved musician', async () => {
+    getSimilarTracks.mockResolvedValueOnce({
+      data: {
+        artist: 'Actual Musician',
+        track: 'Broken',
+        tracks: ROWS,
+        recognition: {
+          status: 'accepted',
+          selected: { artist: 'Actual Musician', title: 'Broken' },
+        },
+      },
+    })
+    const similar = useSimilar()
+    const source = { file: 'Slime AMV.mp3', url: '' }
+    await similar.searchFor('Editor', 'Slime AMV', source)
+    expect(getSimilarTracks).toHaveBeenLastCalledWith(
+      'Editor',
+      'Slime AMV',
+      20,
+      source
+    )
+    expect(similar.artist.value).toBe('Actual Musician')
+    expect(similar.track.value).toBe('Broken')
+    expect(similar.recognition.value.status).toBe('accepted')
+    expect(similar.matchesSource(source)).toBe(true)
+    similar.clear()
+    expect(similar.recognition.value).toBe(null)
+  })
+})

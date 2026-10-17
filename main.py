@@ -35,6 +35,7 @@ from downtify import (
     api,
     auth_routes,
     mobile_routes,
+    recognition_routes,
 )
 from downtify.activity import ActivityLog
 from downtify.auth import AuthMiddleware, AuthStore, auth_disabled_from_env
@@ -87,6 +88,7 @@ from downtify.playlist_spotify_cache import (
     playlist_spotify_cache_loop,
 )
 from downtify.podcasts import PodcastStore
+from downtify.recognition_store import RecognitionStore
 from downtify.server_identity import ServerIdentity
 from downtify.server_port import (
     DEFAULT_PORT,
@@ -353,6 +355,7 @@ def _open_library_stores(monitor_db_path: Path) -> None:
     api.state.stream_cache = stream_cache_from_env(DATABASE_DIR)
     api.state.cover_thumbs = CoverThumbs(DATABASE_DIR / 'cover_thumbs')
     api.state.discover = DiscoverStore(library_db)
+    api.state.recognition = RecognitionStore(library_db)
     api.state.cover_cache = CoverArtCache(DATABASE_DIR / 'cover_cache')
     api.state.upgrade_runner = LibraryUpgradeRunner(
         LibraryUpgradeDB(library_db),
@@ -650,6 +653,7 @@ def build_app() -> FastAPI:
     app.include_router(auth_routes.router)
     app.include_router(account_routes.router)
     app.include_router(mobile_routes.router)
+    app.include_router(recognition_routes.router)
 
     @app.get('/list')
     def list_downloads(request: Request, refresh: bool = False) -> list[str]:

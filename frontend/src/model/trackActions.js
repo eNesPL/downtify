@@ -148,8 +148,19 @@ export function useTrackActions() {
         action: () =>
           router.push({
             name: 'Similar',
-            query: { artist: track.artist, track: track.title },
+            query: {
+              artist: track.artist,
+              track: track.title,
+              file: track.file,
+            },
           }),
+      },
+      {
+        label: t('recognition.menu'),
+        icon: 'search',
+        hidden: !track.file || track.isPodcast,
+        action: () =>
+          router.push({ name: 'Recognize', query: { file: track.file } }),
       },
       {
         label: t('library.saveToDevice'),

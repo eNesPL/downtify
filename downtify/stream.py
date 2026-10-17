@@ -81,16 +81,12 @@ def _ydl_options() -> dict[str, Any]:
     return opts
 
 
-def stream_url_for_video(
+def video_info_for_recognition(
     video_id: str, *, cookies_file: str = ''
 ) -> dict[str, Any]:
-    """The current direct-audio URL of the YouTube video *video_id*.
+    """Read one video's metadata and audio URL with the streaming options.
 
-    Returns ``{url, ext}`` — ``ext`` is ``m4a`` when YouTube served
-    AAC (plays in every browser) and whatever ``bestaudio`` was
-    otherwise. Raises :class:`ValueError` when the id is malformed,
-    age-gated without usable cookies, or YouTube can't be reached.
-    The URL itself is never logged: it carries a signature.
+    Internal use only: the full extractor response contains signed URLs.
     """
 
     vid = clean_video_id(video_id)
@@ -120,6 +116,15 @@ def stream_url_for_video(
         ) from exc
     if not isinstance(info, dict) or not info.get('url'):
         raise ValueError('YouTube answered with an unreadable reply')
+    return info
+
+
+def stream_url_for_video(
+    video_id: str, *, cookies_file: str = ''
+) -> dict[str, Any]:
+    """Resolve one video's short-lived audio URL; never persist it."""
+    vid = clean_video_id(video_id)
+    info = video_info_for_recognition(vid, cookies_file=cookies_file)
     direct = str(info['url'])
     logger.info(
         'Stream URL resolved for videoId={} ext={!r}', vid, info.get('ext')

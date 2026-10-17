@@ -908,6 +908,11 @@ RULES: list[tuple[frozenset[str], re.Pattern[str], str]] = [
         (_ALL, r'^/(delete|delete/batch)$', ADMIN),
         (_ALL, r'^/(docs|redoc|openapi\.json)', ADMIN),
         # Client: what a paired app does.
+        (_READ, r'^/api/music/(recognition|identity|similar)', CLIENT),
+        (_m('POST'), r'^/api/music/recognize$', CLIENT),
+        (_m('POST'), r'^/api/music/library/scan$', CLIENT),
+        (_m('PATCH'), r'^/api/music/recognition/[a-f0-9]+$', CLIENT),
+        (_m('POST'), r'^/api/music/recognition/[a-f0-9]+/tags$', ADMIN),
         (_ALL, r'^/api/v1/', CLIENT),
         (_ALL, r'^/api/ws$', CLIENT),
         (

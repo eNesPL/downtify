@@ -31,6 +31,11 @@
   <img src="assets/readme-hero.png" alt="Downtify 3.0: paste a Spotify link, get the music. The home screen, the full-screen player and the mobile app." width="100%">
 </p>
 
+**Know a song from an AMV?** [AMV song recognition](docs/features/amv-recognition.md)
+finds the actual musician, keeps your AMV audio and uses your approved identity
+for similar-song recommendations. Includes optional audio recognition,
+checkpointed library batches and reversible admin tag correction.
+
 ## Overview
 
 Downtify is a self-hosted web app that turns Spotify and YouTube Music links into a tagged audio library. It never touches the Spotify API, and it needs no account and no Premium subscription. It also plays that library back, so what you download is one tab away from listening.

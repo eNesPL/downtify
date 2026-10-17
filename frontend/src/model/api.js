@@ -178,8 +178,31 @@ function finderAlbum(albumId) {
 // ── Similar tracks (YouTube Music) ───────────────────────────────
 // Tracks similar to one track, by artist + title - see
 // downtify/providers.py. Needs no key.
-function getSimilarTracks(artist, track, limit = 20) {
-  return API.get('/api/similar/tracks', { params: { artist, track, limit } })
+function getSimilarTracks(artist, track, limit = 20, source = {}) {
+  const endpoint =
+    source.file || source.url ? '/api/music/similar' : '/api/similar/tracks'
+  return API.get(endpoint, { params: { artist, track, limit, ...source } })
+}
+function scanRecognitionLibrary(payload) {
+  return API.post('/api/music/library/scan', payload)
+}
+function editRecognitionTags(id, action) {
+  return API.post(`/api/music/recognition/${id}/tags`, { action })
+}
+function recognizeMusic(payload) {
+  return API.post('/api/music/recognize', payload)
+}
+function getRecognition(id) {
+  return API.get(`/api/music/recognition/${id}`)
+}
+function decideRecognition(id, payload) {
+  return API.patch(`/api/music/recognition/${id}`, payload)
+}
+function recentRecognition() {
+  return API.get('/api/music/recognition')
+}
+function recognitionCapabilities() {
+  return API.get('/api/music/recognition/capabilities')
 }
 
 // A track's full audio as a fresh direct URL - the player behind a song
@@ -775,6 +798,13 @@ export default {
   finderTrackCounts,
   finderAlbum,
   getSimilarTracks,
+  recognizeMusic,
+  scanRecognitionLibrary,
+  editRecognitionTags,
+  getRecognition,
+  decideRecognition,
+  recentRecognition,
+  recognitionCapabilities,
   getStreamUrl,
   prefetchStream,
   getArtistArt,
