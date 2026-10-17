@@ -129,3 +129,11 @@ incompatible candidate video id. Jobs can be `queued`, `running`, `review`,
 Recognition and discovery calls are separate from playback, so opening a song
 never waits for the recognition queue. Missing providers or provider failures
 produce warnings while keeping manual correction available.
+
+## Credits containing several artists
+
+When a source stores collaborators in one credit (for example,
+`Lil Wayne, Wiz Khalifa, & Imagine Dragons`), recording matching compares
+individual credited artists with YouTube Music as well as the whole name.
+An overlapping artist and a matching title are still required; live, remix
+and unrelated recordings remain subject to the existing matching gates.

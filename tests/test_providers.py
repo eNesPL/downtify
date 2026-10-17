@@ -3551,3 +3551,31 @@ def test_resolve_artist_id_with_nothing_left_of_the_name_searches_nothing(
 
     monkeypatch.setattr(providers, '_ytm', boom)
     assert resolve_artist_id('???') is None
+
+
+def test_pick_best_splits_packed_source_artist_credit():
+    row = _song_row(
+        'Sucker for Pain (with Logic, Ty Dolla $ign & X Ambassadors)',
+        'Lil Wayne',
+        'Suicide Squad',
+        244,
+        'correct',
+    )
+    packed = ['Lil Wayne, Wiz Khalifa, & Imagine Dragons']
+    assert _pick_best([row], 244, 'Sucker for Pain', packed) is row
+    assert (
+        _pick_best([row], 244, 'Sucker for Pain', ['Unrelated Artist']) is None
+    )
+
+
+def test_packed_source_credit_does_not_accept_different_recording():
+    row = _song_row('Sucker for Pain (Live)', 'Lil Wayne', '', 244, 'live')
+    assert (
+        _pick_best(
+            [row],
+            244,
+            'Sucker for Pain',
+            ['Lil Wayne, Wiz Khalifa, & Imagine Dragons'],
+        )
+        is None
+    )
