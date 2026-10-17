@@ -349,6 +349,7 @@ class Downloader:
     #: own thread, so it must only hand the work off and return. Whatever it
     #: raises is logged and never fails the download.
     on_downloaded: Optional[Callable[[dict[str, Any], str], None]] = None
+    music_guard: Optional[Any] = None
 
     def __init__(
         self,
@@ -798,6 +799,8 @@ class Downloader:
         returned instead (see :meth:`find_existing_download`).
         """
 
+        if self.music_guard is not None:
+            self.music_guard.preflight_context(song)
         skip_existing = not self.overwrite_existing_files
         if skip_existing and self._can_resolve_path_early(song):
             existing = self.find_existing_download(song, subdir)
@@ -850,6 +853,8 @@ class Downloader:
         reject_overlong_song(song, self.max_track_duration_seconds)
 
         if local_source is not None:
+            if self.music_guard is not None:
+                self.music_guard.enforce(song)
             return self._downloaded(
                 song,
                 self._finalize_local_source(
@@ -1139,6 +1144,8 @@ class Downloader:
         format) and return the file - untagged. *song* only words the
         error when it fails."""
 
+        if self.music_guard is not None:
+            self.music_guard.enforce(song, video_id)
         fmt = audio_format or self.audio_format
         out_template = str(target_dir / f'{basename}.%(ext)s')
         hook = self._progress_hook(progress_cb, provider)

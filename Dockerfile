@@ -1,7 +1,7 @@
 FROM mwader/static-ffmpeg:latest AS ffmpeg-bin
 FROM denoland/deno:alpine AS deno-bin
 
-FROM python:3.15-alpine AS builder
+FROM python:3.13-alpine AS builder
 
 WORKDIR /build
 
@@ -25,7 +25,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Final minimal runtime image
-FROM python:3.15-alpine
+FROM python:3.13-alpine
 
 LABEL maintainer="Henrique Sebastião <contato@henriquesebastiao.com>"
 LABEL version="3.5.0"
@@ -35,12 +35,12 @@ LABEL org.opencontainers.image.title="Downtify" \
     org.opencontainers.image.description="Download your Spotify playlists and songs along with album art and metadata in a self-hosted way via Docker." \
     org.opencontainers.image.version="3.5.0" \
     org.opencontainers.image.authors="Henrique Sebastião <contato@henriquesebastiao.com>" \
-    org.opencontainers.image.url="https://github.com/henriquesebastiao/downtify" \
-    org.opencontainers.image.source="https://github.com/henriquesebastiao/downtify" \
+    org.opencontainers.image.url="https://github.com/eNesPL/downtify" \
+    org.opencontainers.image.source="https://github.com/eNesPL/downtify" \
     org.opencontainers.image.licenses="AGPL-3.0" \
-    org.opencontainers.image.documentation="https://github.com/henriquesebastiao/downtify#readme" \
+    org.opencontainers.image.documentation="https://github.com/eNesPL/downtify#readme" \
     org.opencontainers.image.vendor="Henrique Sebastião" \
-    org.opencontainers.image.base.name="python:3.15-alpine"
+    org.opencontainers.image.base.name="python:3.13-alpine"
 
 # Runtime configuration
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -61,6 +61,7 @@ RUN apk update && apk upgrade --no-cache && \
     shadow \
     su-exec \
     tini \
+    chromaprint \
     tzdata 
 
 # Add Deno and its glibc runtime to the Alpine image.
@@ -71,14 +72,14 @@ RUN mkdir -p /lib64 && ln -sf /usr/local/lib/glibc/ld-linux-* /lib64/
 
 # Remove the Python packages that come with the base image before
 # copying in the exact environment built above.
-RUN rm -rf /usr/local/lib/python3.15/site-packages/*
+RUN rm -rf /usr/local/lib/python3.13/site-packages/*
 
 # Add FFmpeg/ffprobe binaries
 COPY --from=ffmpeg-bin /ffmpeg /usr/local/bin/ffmpeg
 COPY --from=ffmpeg-bin /ffprobe /usr/local/bin/ffprobe
 
 # Copy Python dependencies and their installed CLI entry points
-COPY --from=builder /usr/local/lib/python3.15/site-packages /usr/local/lib/python3.15/site-packages
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Application files

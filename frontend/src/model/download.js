@@ -4,6 +4,7 @@ import { ref } from 'vue'
 import { isYouTubePlaylistURL, normalizeSpotifyURL } from '/src/model/url'
 
 import API from '/src/model/api'
+import { openAiReview, openAiBatchReview } from '/src/model/aiGuard'
 import { useSettingsManager } from '/src/model/settings'
 
 const STATUS = {
@@ -293,15 +294,24 @@ export function useDownloadManager() {
     }
     touchQueue()
     ensureQueuePoll()
-    await API.downloadBatch({
+    const response = await API.downloadBatch({
       songs,
       playlist_url: playlistUrl,
       playlist_name: playlistName,
       cover_url: coverUrl,
       generate_m3u: m3u ?? generateM3u(),
     })
+    const skipped = response.data?.ai_guard_skipped || []
+    for (const blocked of skipped) {
+      const item = findItem(blocked.song)
+      if (item) {
+        item.message = blocked.message
+        item.setError()
+      }
+    }
+    if (skipped.length) openAiBatchReview(skipped, download)
     await syncQueueFromServer().catch(() => {})
-    return songs.length
+    return response.data?.count ?? songs.length
   }
 
   /** Resolve a link and queue everything it points at. */
@@ -340,6 +350,8 @@ export function useDownloadManager() {
         playlist_name: playlistName || '',
         generate_m3u: generateM3u(),
       })
+      if (res.data?.ai_guard_skipped?.length)
+        openAiBatchReview(res.data.ai_guard_skipped, download)
       syncQueueFromServer().catch(() => {})
       return res.data
     } finally {
@@ -356,7 +368,13 @@ export function useDownloadManager() {
       item.setDownloaded()
       return { song, filename: res.data }
     } catch (err) {
-      item.message = err?.response?.data?.detail || item.message
+      const detail = err?.response?.data?.detail
+      item.message =
+        detail?.message || (typeof detail === 'string' ? detail : item.message)
+      if (detail?.code === 'ai_guard')
+        openAiReview(song, detail, (confirmation) =>
+          download({ ...song, ai_confirmation: confirmation })
+        )
       item.setError()
       return { song, filename: null }
     }

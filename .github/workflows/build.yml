@@ -1,67 +1,127 @@
-name: Build and Push Docker Image
+name: Build and publish GHCR image
 
 on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
   release:
     types: [published]
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-      - name: Check out code
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
+      - name: Check out source
+        uses: actions/checkout@v6
 
-      - name: Extract version from git tags
-        id: version
-        run: echo "VERSION=$(git describe --tags --always | cut -d'-' -f1)" >> "$GITHUB_OUTPUT"
-    
+      - name: Set lowercase image name
+        id: image
+        shell: bash
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Docker meta
+      - name: Image tags and labels
         id: meta
         uses: docker/metadata-action@v6
         with:
-          annotations: |
-            type=org.opencontainers.image.description, value=Download your Spotify playlists and songs along with album art and metadata in a self-hosted way via Docker.
-            type=org.opencontainers.image.url, value=https://github.com/henriquesebastiao/downtify
-            type=org.opencontainers.image.source, value=https://github.com/henriquesebastiao/downtify
-            type=org.opencontainers.image.version, value=${{ steps.version.outputs.VERSION }}
-            type=org.opencontainers.image.authors, value=Henrique Sebastião <contato@henriquesebastiao.com>
-            type=org.opencontainers.image.licenses, value=AGPL-3.0
-            type=org.opencontainers.image.vendor, value=Henrique Sebastião
-            type=org.opencontainers.image.base.name, value=python:3.13-alpine
-            type=org.opencontainers.image.title, value=Downtify
-    
-      - name: Login to DockerHub
-        uses: docker/login-action@v4.6.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v4.6.0
+      - name: Build local smoke-test image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: downtify:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify application and fingerprint tool as UID 1000
+        shell: bash
+        run: |
+          set -euo pipefail
+          smoke_root=$(mktemp -d)
+          mkdir -p "$smoke_root/data" "$smoke_root/downloads"
+          chmod 0777 "$smoke_root/data" "$smoke_root/downloads"
+          trap 'docker logs downtify-smoke || true; docker rm -fv downtify-smoke || true; rm -rf "$smoke_root"' EXIT
+          docker run --rm --user 1000:1000 --entrypoint python downtify:smoke -c \
+            'import main, shutil; from downtify import ai_guard, recognition; assert shutil.which("fpcalc"); assert shutil.which("ffmpeg")'
+          docker run -d --name downtify-smoke --user 1000:1000 \
+            -p 127.0.0.1:18000:8000 \
+            -v "$smoke_root/data:/data" \
+            -v "$smoke_root/downloads:/downloads" \
+            -e DOWNTIFY_PORT=8000 \
+            -e DOWNTIFY_DISCOVERY=false \
+            -e DOWNTIFY_DISABLE_AUTH=true \
+            downtify:smoke
+          ready=false
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18000/api/health >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 2
+          done
+          test "$ready" = true
+          curl --fail --silent http://127.0.0.1:18000/api/v1/music/ai-settings \
+            | python3 -c 'import json,sys; policy=json.load(sys.stdin); assert policy["enabled"] and policy["mode"] == "balanced"'
+          curl --fail --silent http://127.0.0.1:18000/api/music/recognition/capabilities \
+            | python3 -c 'import json,sys; assert json.load(sys.stdin)["metadata"]'
+          curl --fail --silent http://127.0.0.1:18000/recognize >/dev/null
+
+      - name: Sign in to GitHub Container Registry
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push app image
-        id: push
+      - name: Build and publish amd64 and arm64
+        id: publish
         uses: docker/build-push-action@v7
         with:
           context: .
           push: true
-          tags: |
-            henriquesebastiao/downtify:latest
-            henriquesebastiao/downtify:${{ steps.version.outputs.VERSION }}
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}
           platforms: linux/amd64,linux/arm64
-          build-args: |
-            DOCKER_METADATA_OUTPUT_JSON
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Record immutable deployment image
+        shell: bash
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          DIGEST: ${{ steps.publish.outputs.digest }}
+        run: |
+          {
+            echo '## Published container'
+            echo
+            echo "\`$IMAGE:sha-$GITHUB_SHA\`"
+            echo
+            echo "\`$IMAGE@$DIGEST\`"
+            echo
+            echo 'Use the digest or full commit tag for Kubernetes rollouts.'
+          } >> "$GITHUB_STEP_SUMMARY"

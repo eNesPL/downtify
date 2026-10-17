@@ -32,12 +32,16 @@ from uvicorn import Config, Server
 from downtify import (
     __version__,
     account_routes,
+    ai_guard_routes,
     api,
     auth_routes,
     mobile_routes,
     recognition_routes,
 )
 from downtify.activity import ActivityLog
+from downtify.ai_guard import AIGuard
+from downtify.ai_guard_middleware import AIGuardMiddleware
+from downtify.ai_guard_store import AIGuardStore
 from downtify.auth import AuthMiddleware, AuthStore, auth_disabled_from_env
 from downtify.cookies import CookiesStore
 from downtify.cover_art import extract_cover_art
@@ -356,6 +360,10 @@ def _open_library_stores(monitor_db_path: Path) -> None:
     api.state.cover_thumbs = CoverThumbs(DATABASE_DIR / 'cover_thumbs')
     api.state.discover = DiscoverStore(library_db)
     api.state.recognition = RecognitionStore(library_db)
+    api.state.ai_guard = AIGuard(AIGuardStore(library_db))
+    api.state.ai_guard.cookies = api.state.cookies_store
+    if api.state.downloader is not None:
+        api.state.downloader.music_guard = api.state.ai_guard
     api.state.cover_cache = CoverArtCache(DATABASE_DIR / 'cover_cache')
     api.state.upgrade_runner = LibraryUpgradeRunner(
         LibraryUpgradeDB(library_db),
@@ -552,6 +560,9 @@ def build_app() -> FastAPI:
             await api.state.discovery.stop()
             api.state.discovery = None
         await api.shutdown_resources()
+        api.state.ai_guard = None
+        if api.state.downloader is not None:
+            api.state.downloader.music_guard = None
 
     app = FastAPI(
         lifespan=lifespan,
@@ -599,6 +610,7 @@ def build_app() -> FastAPI:
         ],
     )
     # Compress large JSON listings (``GET /tracks``) for the web UI.
+    app.add_middleware(AIGuardMiddleware)
     app.add_middleware(GZipMiddleware, minimum_size=1000)
 
     settings_path = DATABASE_DIR / 'settings.json'
@@ -642,6 +654,9 @@ def build_app() -> FastAPI:
     # A finished download (from the UI or a monitor sweep alike) seeds its
     # artist's profile in the background.
     api.state.downloader.on_downloaded = api.enrich_artist_after_download
+    api.state.downloader.music_guard = api.state.ai_guard
+    if api.state.ai_guard is not None:
+        api.state.ai_guard.cookies = api.state.cookies_store
     api.providers.set_cover_resolution(
         api._clamp_cover_resolution(
             api.state.settings.get(
@@ -654,6 +669,7 @@ def build_app() -> FastAPI:
     app.include_router(account_routes.router)
     app.include_router(mobile_routes.router)
     app.include_router(recognition_routes.router)
+    app.include_router(ai_guard_routes.router)
 
     @app.get('/list')
     def list_downloads(request: Request, refresh: bool = False) -> list[str]:

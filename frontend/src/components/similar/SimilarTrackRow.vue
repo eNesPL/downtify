@@ -54,6 +54,7 @@
          from this track, then the download state. Wide enough for the
          wand plus the download's widest state (see TrackDownPlay). -->
     <div class="flex w-40 shrink-0 items-center justify-end gap-2">
+      <AiGuardBadge :song="song" />
       <SimilarButton
         :source-url="song.url"
         :artist="firstArtist"
@@ -88,6 +89,7 @@
 </template>
 
 <script setup>
+import AiGuardBadge from '/src/components/library/AiGuardBadge.vue'
 // One similar track: full playback on the cover (from the library, else
 // streamed), and a download button straight from its video id. The row
 // hands off to DownloadState, so progress, queue and retry look exactly

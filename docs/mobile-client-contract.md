@@ -221,3 +221,13 @@ poll jobs, approve identities, scan owned library files and request similar
 tracks based on the approved musician. These additive routes are outside v1;
 treat 404 as an older server without this extension. Shared file tag writes
 remain administrator-only.
+
+## Optional AI Music Guard extension
+
+Probe `GET /api/v1/music/ai-settings`; handle 404 for older servers. The server
+enforces guard policy for paired clients' downloads even when they have no
+guard screen. Handle HTTP 409 `detail.code = "ai_guard"` as a review decision,
+not a transient network failure. Do not retry it automatically or add a boolean
+bypass. Use the [guard API](features/ai-music-guard.md#api-extension) for evidence,
+account exceptions, single-use confirmations and per-track import reports.
+The native Android app is unchanged by the server/web implementation.

@@ -2738,3 +2738,11 @@ its original source, and use an explicitly approved identity for recommendations
 See [AMV recognition API](features/amv-recognition.md#api) for request and response
 shapes, job states, provider configuration, library scanning and reversible
 administrator tag correction. Existing similar-track endpoints are unchanged.
+
+## AI Music Guard
+
+The optional [AI Music Guard extension](features/ai-music-guard.md#api-extension)
+adds authenticated assessments, policy settings, feedback, one-use exceptions
+and metadata scans under `/api/v1/music/`. Guarded downloads can return HTTP 409
+with structured evidence; playlist and CSV submissions report skipped rows.
+The original album response stays compatible unless `guard_report=true` is set.

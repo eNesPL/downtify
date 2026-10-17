@@ -183,6 +183,24 @@ function getSimilarTracks(artist, track, limit = 20, source = {}) {
     source.file || source.url ? '/api/music/similar' : '/api/similar/tracks'
   return API.get(endpoint, { params: { artist, track, limit, ...source } })
 }
+function aiCheck(payload) {
+  return API.post('/api/v1/music/ai-check', payload)
+}
+function aiFeedback(payload) {
+  return API.post('/api/v1/music/ai-feedback', payload)
+}
+function aiSettings() {
+  return API.get('/api/v1/music/ai-settings')
+}
+function setAiSettings(payload) {
+  return API.put('/api/v1/music/ai-settings', payload)
+}
+function aiScan(payload = {}) {
+  return API.post('/api/v1/music/library/ai-scan', payload)
+}
+function aiScanStatus(id) {
+  return API.get(`/api/v1/music/library/ai-scan/${id}`)
+}
 function scanRecognitionLibrary(payload) {
   return API.post('/api/music/library/scan', payload)
 }
@@ -800,6 +818,12 @@ export default {
   getSimilarTracks,
   recognizeMusic,
   scanRecognitionLibrary,
+  aiCheck,
+  aiFeedback,
+  aiSettings,
+  setAiSettings,
+  aiScan,
+  aiScanStatus,
   editRecognitionTags,
   getRecognition,
   decideRecognition,
