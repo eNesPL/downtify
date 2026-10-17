@@ -129,6 +129,7 @@
       @click.stop
       @dblclick.stop
     >
+      <AiGuardBadge :song="song" />
       <SimilarButton
         :source-url="song.url"
         :artist="firstArtist"
@@ -141,6 +142,7 @@
 </template>
 
 <script setup>
+import AiGuardBadge from '/src/components/library/AiGuardBadge.vue'
 // One song as a row that downloads, then plays: minimal like a search
 // result (SongRow), with the play affordances TrackList has on an album page
 // once the song is in the library (the number turns into a play button on

@@ -334,6 +334,7 @@ from . import (
     stream,
 )
 from .activity import ActivityLog, NowPlaying, describe_user_agent
+from .ai_guard import AIGuard, MusicGuardBlocked
 from .auth import (
     AuthStore,
     PairingStore,
@@ -989,6 +990,7 @@ class ConnectionManager:
 
 
 class AppState:
+    ai_guard: Optional[AIGuard] = None
     recognition: Optional[RecognitionStore] = None
     recognition_semaphore: Optional[asyncio.Semaphore] = None
     version: str = '0.0.0'
@@ -3255,6 +3257,11 @@ def _register_job(
     - the retry/re-download behavior stays exactly as it was.
     """
 
+    if state.ai_guard is not None:
+        try:
+            state.ai_guard.preflight(song, user_id)
+        except MusicGuardBlocked as exc:
+            raise HTTPException(status_code=409, detail=exc.detail()) from exc
     song_id = str(song.get('song_id') or song.get('url') or id(song))
     job = state.download_jobs.get(song_id)
     if job is None:
@@ -3395,7 +3402,11 @@ async def _run_download(
     try:
         async with lock:
             if job.get('status') == 'done' and job.get('filename'):
+                if state.ai_guard is not None:
+                    state.ai_guard.enforce_existing(song, user_id)
                 sharers = _job_users(job)
+                if state.ai_guard is not None:
+                    sharers = state.ai_guard.shareable(song, sharers)
                 if sharers:
                     await asyncio.to_thread(
                         _note_download_owners,
@@ -3457,6 +3468,8 @@ async def _run_download_locked(
                     track_index=state.track_index,
                 )
                 if existing_hit:
+                    if state.ai_guard is not None:
+                        state.ai_guard.enforce_existing(song, user_id)
                     existing, skip_message = existing_hit
                     logger.info(
                         'Skipping download ({}): {}',
@@ -3470,6 +3483,8 @@ async def _run_download_locked(
                         message=skip_message,
                     )
                     sharers = _job_users(job)
+                    if state.ai_guard is not None:
+                        sharers = state.ai_guard.shareable(song, sharers)
                     if sharers:
                         # The file is shared, the ownership isn't:
                         # everyone waiting on this job asked for it too.
@@ -3524,11 +3539,18 @@ async def _run_download_locked(
                     loop,
                 )
 
+            def guarded_download() -> str:
+                if state.ai_guard is None:
+                    return state.downloader.download(
+                        song, progress, subdir=subdir
+                    )
+                with state.ai_guard.context(user_id, song):
+                    return state.downloader.download(
+                        song, progress, subdir=subdir
+                    )
+
             filename = await loop.run_in_executor(
-                DOWNLOAD_EXECUTOR,
-                lambda: state.downloader.download(
-                    song, progress, subdir=subdir
-                ),
+                DOWNLOAD_EXECUTOR, guarded_download
             )
             job['status'] = 'done'
             job['filename'] = filename
@@ -3544,6 +3566,8 @@ async def _run_download_locked(
                     user_id=user_id,
                 )
                 others = _job_users(job) - ({user_id} if user_id else set())
+                if state.ai_guard is not None:
+                    others = state.ai_guard.shareable(song, others)
                 if others:
                     # The leader is recorded inside
                     # _record_finished_download; everyone else waiting
@@ -3565,7 +3589,11 @@ async def _run_download_locked(
             if delay_seconds > 0:
                 await asyncio.sleep(delay_seconds)
     except Exception as exc:
-        if isinstance(exc, (NoAudioMatchError, TrackTooLongError)):
+        if isinstance(exc, MusicGuardBlocked):
+            job['ai_guard'] = exc.detail()
+        if isinstance(
+            exc, (NoAudioMatchError, TrackTooLongError, MusicGuardBlocked)
+        ):
             # An expected outcome, not a crash: no traceback in the log.
             logger.warning('{} ({})', exc, song_id)
             message = str(exc)
@@ -3669,6 +3697,10 @@ async def download_endpoint(
     song = await asyncio.to_thread(
         _song_from_download_request, url, client_hints
     )
+    if isinstance(client_hints, dict) and isinstance(
+        client_hints.get('ai_confirmation'), str
+    ):
+        song['ai_confirmation'] = client_hints['ai_confirmation'][:200]
     # A retried track from a playlist carries its playlist in the hints,
     # so it lands in that playlist's folder and catalog.
     pl_ctx = await asyncio.to_thread(
@@ -3700,6 +3732,8 @@ async def download_endpoint(
             track_order=int(pl_ctx.get('track_order') or 0),
             user_id=user_id,
         )
+    except MusicGuardBlocked as exc:
+        raise HTTPException(status_code=409, detail=exc.detail()) from exc
     except NoAudioMatchError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except TrackTooLongError as exc:
@@ -4745,13 +4779,26 @@ async def _submit_playlist_batch(
 ) -> dict[str, Any]:
     valid_songs: list[dict[str, Any]] = []
     job_ids: list[str] = []
+    skipped: list[dict[str, Any]] = []
     for song in songs:
         if not isinstance(song, dict):
             continue
-        song_id = _register_job(song, status='queued', user_id=user_id)
+        try:
+            song_id = _register_job(song, status='queued', user_id=user_id)
+        except HTTPException as exc:
+            if (
+                exc.status_code != 409
+                or not isinstance(exc.detail, dict)
+                or exc.detail.get('code') != 'ai_guard'
+            ):
+                raise
+            skipped.append({'song': song, **exc.detail})
+            continue
         valid_songs.append(song)
         job_ids.append(song_id)
 
+    if not valid_songs and skipped:
+        return {'job_ids': [], 'count': 0, 'ai_guard_skipped': skipped}
     if not valid_songs:
         raise HTTPException(status_code=400, detail='No valid songs in batch')
 
@@ -4781,7 +4828,10 @@ async def _submit_playlist_batch(
             logger.opt(exception=exc).error('Batch processing crashed')
 
     task.add_done_callback(_log_batch_failure)
-    return {'job_ids': job_ids, 'count': len(job_ids)}
+    result = {'job_ids': job_ids, 'count': len(job_ids)}
+    if skipped:
+        result['ai_guard_skipped'] = skipped
+    return result
 
 
 @router.post('/api/download/batch')
@@ -4907,9 +4957,30 @@ async def download_csv_endpoint(request: Request) -> dict[str, Any]:
 
     user_id = request_user_id(request)
     job_ids: list[str] = []
+    allowed_songs: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
     for song in songs:
-        song_id = _register_job(song, status='queued', user_id=user_id)
+        try:
+            song_id = _register_job(song, status='queued', user_id=user_id)
+        except HTTPException as exc:
+            if (
+                exc.status_code != 409
+                or not isinstance(exc.detail, dict)
+                or exc.detail.get('code') != 'ai_guard'
+            ):
+                raise
+            skipped.append({'song': song, **exc.detail})
+            continue
+        allowed_songs.append(song)
         job_ids.append(song_id)
+
+    if not allowed_songs:
+        return {
+            'job_ids': [],
+            'count': 0,
+            'playlist_name': playlist_name,
+            'ai_guard_skipped': skipped,
+        }
 
     # Same single reload as _submit_playlist_batch. The rows are already
     # in download_jobs; clients fetch them with GET /api/queue.
@@ -4917,7 +4988,7 @@ async def download_csv_endpoint(request: Request) -> dict[str, Any]:
 
     task = spawn_task(
         _process_batch(
-            songs,
+            allowed_songs,
             job_ids,
             '',
             generate_m3u,
@@ -4935,11 +5006,15 @@ async def download_csv_endpoint(request: Request) -> dict[str, Any]:
             logger.opt(exception=exc).error('CSV batch processing crashed')
 
     task.add_done_callback(_log_batch_failure)
-    return {
+    result = {
         'job_ids': job_ids,
         'count': len(job_ids),
         'playlist_name': playlist_name,
     }
+
+    if skipped:
+        result['ai_guard_skipped'] = skipped
+    return result
 
 
 def _songs_for_album_download(url: str) -> list[dict[str, Any]]:
@@ -4960,8 +5035,8 @@ def _songs_for_album_download(url: str) -> list[dict[str, Any]]:
 
 @router.post('/api/download/album')
 async def download_album_endpoint(
-    request: Request, url: str = Query(...)
-) -> dict[str, str]:
+    request: Request, url: str = Query(...), guard_report: bool = False
+) -> dict[str, Any]:
     """Download every track of a YouTube Music album/browse URL.
 
     Unlike ``POST /api/download/url`` (which only accepts a single video URL
@@ -4997,26 +5072,40 @@ async def download_album_endpoint(
 
     user_id = request_user_id(request)
 
+    skipped: list[dict[str, Any]] = []
+
     async def _one(song: dict[str, Any]) -> tuple[str, Optional[str]]:
         song_id = str(song.get('song_id') or '')
         if not song_id:
             return '', None
-        job_id = _register_job(song, status='downloading', user_id=user_id)
+        try:
+            job_id = _register_job(song, status='downloading', user_id=user_id)
+        except HTTPException as exc:
+            if exc.status_code == 409 and isinstance(exc.detail, dict):
+                skipped.append({'song': song, **exc.detail})
+                return song_id, None
+            raise
         try:
             filename = await _run_download(
                 song, job_id, delay_seconds=delay_seconds, user_id=user_id
             )
+        except MusicGuardBlocked as exc:
+            skipped.append({'song': song, **exc.detail()})
+            return song_id, None
         except Exception:
             logger.exception('Album track download failed for {}', song_id)
             return song_id, None
         return song_id, filename
 
     results = await asyncio.gather(*(_one(song) for song in songs))
-    return {
+    downloaded = {
         song_id: filename
         for song_id, filename in results
         if song_id and filename
     }
+    if guard_report:
+        return {'downloads': downloaded, 'ai_guard_skipped': skipped}
+    return downloaded
 
 
 @router.post('/api/library/reconcile')
@@ -5311,7 +5400,9 @@ async def replace_track_audio(request: Request) -> dict[str, Any]:
         # replaces again instead of downloading a new track.
         'replace': {'file': file, 'video_id': video_id},
     }
-    job_id = _register_job(song, status='downloading')
+    job_id = _register_job(
+        song, status='downloading', user_id=request_user_id(request)
+    )
     _replacing.add(file)
     await log_activity(
         request,
@@ -5364,22 +5455,32 @@ async def _run_replacement(
             'status': 'downloading',
         })
         async with sem if sem is not None else contextlib.nullcontext():
-            await loop.run_in_executor(
-                DOWNLOAD_EXECUTOR,
-                lambda: audio_replace.replace_audio(
-                    state.downloader,
-                    full,
-                    video_id,
-                    song=song,
-                    progress_cb=progress,
-                ),
-            )
+
+            def guarded_replace() -> dict[str, Any]:
+                def replace() -> dict[str, Any]:
+                    return audio_replace.replace_audio(
+                        state.downloader,
+                        full,
+                        video_id,
+                        song=song,
+                        progress_cb=progress,
+                    )
+
+                if state.ai_guard is None:
+                    return replace()
+                user_id = next(iter(_job_users(job)), 0)
+                with state.ai_guard.context(user_id, song):
+                    return replace()
+
+            await loop.run_in_executor(DOWNLOAD_EXECUTOR, guarded_replace)
     except Exception as exc:
         _replacing.discard(file)
         logger.opt(
             exception=not isinstance(exc, audio_replace.ReplaceError)
         ).warning('Replacing the audio of {} failed: {}', file, exc)
         message = f'Error: {exc}'
+        if isinstance(exc, MusicGuardBlocked):
+            job['ai_guard'] = exc.detail()
         job.update(status='error', message=message)
         await state.connections.broadcast({
             'song': song,

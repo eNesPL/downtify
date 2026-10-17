@@ -36,6 +36,11 @@ finds the actual musician, keeps your AMV audio and uses your approved identity
 for similar-song recommendations. Includes optional audio recognition,
 checkpointed library batches and reversible admin tag correction.
 
+[AI Music Guard](docs/features/ai-music-guard.md) filters known AI music from
+discovery and checks requested songs plus their selected YouTube versions
+before download. Includes evidence, account exceptions and per-track import
+reports; metadata checks do not guarantee human authorship.
+
 ## Overview
 
 Downtify is a self-hosted web app that turns Spotify and YouTube Music links into a tagged audio library. It never touches the Spotify API, and it needs no account and no Premium subscription. It also plays that library back, so what you download is one tab away from listening.

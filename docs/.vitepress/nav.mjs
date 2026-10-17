@@ -23,6 +23,7 @@ export const NAV = [
       { title: 'Charts', page: 'features/charts.md' },
       { title: 'Similar', page: 'features/similar.md' },
       { title: 'AMV Recognition', page: 'features/amv-recognition.md' },
+      { title: 'AI Music Guard', page: 'features/ai-music-guard.md' },
       { title: 'Finder', page: 'features/finder.md' },
       { title: 'Download Settings', page: 'features/download-settings.md' },
       { title: 'Playlist Monitor', page: 'features/playlist-monitor.md' },
