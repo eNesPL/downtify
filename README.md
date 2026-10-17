@@ -33,7 +33,7 @@
 
 **Know a song from an AMV?** [AMV song recognition](docs/features/amv-recognition.md)
 lets you compare the source and suggested recordings before saving an identity, keeps your AMV audio and uses your approved identity
-for similar-song recommendations. Includes optional audio recognition,
+for similar-song recommendations. Matching also handles several artists packed into one credit. Includes optional audio recognition,
 checkpointed library batches and reversible admin tag correction.
 
 [AI Music Guard](docs/features/ai-music-guard.md) filters known AI music from

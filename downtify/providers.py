@@ -2528,7 +2528,16 @@ def _artists_overlap(
     picked just for being the "least wrong" duration match.
     """
 
-    target_set = {_norm_artist_name(a) for a in (target_artists or []) if a}
+    target_set: set[str] = set()
+    for name in target_artists or []:
+        if not name:
+            continue
+        target_set.add(_norm_artist_name(name))
+        target_set.update(
+            _norm_artist_name(part)
+            for part in _ARTIST_CREDIT_SPLIT_RE.split(name)
+            if part
+        )
     target_set.discard('')
     if not target_set:
         return True
