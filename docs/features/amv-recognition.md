@@ -13,7 +13,14 @@ link, or choose **Recognize AMV song** from a library track's menu.
    then searches YouTube Music for candidates. The uploader is never treated
    as evidence of the musician. Search suggestions are explicitly marked as
    text matches, not audio identifications.
-2. Review the candidates. Select one, or enter the correct title and artist
+2. Use **Listen to source AMV / file** and **Listen to this candidate** to
+   compare the recordings before approving. Playback uses the shared player,
+   with pause and seeking; only one recording plays at a time. A local source
+   uses its exact file and a YouTube source uses its exact video. Candidates
+   use their video ID when available; otherwise playback searches by artist
+   and title, explicitly marked as an unverified version. Listening does not
+   add a file to your library or approve an identity. Normal streaming limits
+   and availability apply. Select one, or enter the correct title and artist
    yourself. Nothing is approved automatically, including audio matches.
 3. **Save song identity** stores a per-account source → song association in
    the existing library database. It leaves the source audio, tags, path,

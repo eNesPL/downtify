@@ -32,7 +32,7 @@
 </p>
 
 **Know a song from an AMV?** [AMV song recognition](docs/features/amv-recognition.md)
-finds the actual musician, keeps your AMV audio and uses your approved identity
+lets you compare the source and suggested recordings before saving an identity, keeps your AMV audio and uses your approved identity
 for similar-song recommendations. Includes optional audio recognition,
 checkpointed library batches and reversible admin tag correction.
 
