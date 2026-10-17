@@ -23,6 +23,7 @@
     <ShortcutsDialog v-model:open="shortcutsOpen" />
     <UiToasts />
     <UiDialog />
+    <AiGuardDialog />
     <CreatePlaylistModal />
     <RenamePlaylistModal />
     <AddTracksToPlaylistModal />
@@ -42,6 +43,7 @@ import NowPlaying from './NowPlaying.vue'
 import ShortcutsDialog from './ShortcutsDialog.vue'
 import UiToasts from '../ui/UiToasts.vue'
 import UiDialog from '../ui/UiDialog.vue'
+import AiGuardDialog from '../library/AiGuardDialog.vue'
 import CreatePlaylistModal from '../library/CreatePlaylistModal.vue'
 import RenamePlaylistModal from '../library/RenamePlaylistModal.vue'
 import AddTracksToPlaylistModal from '../library/AddTracksToPlaylistModal.vue'

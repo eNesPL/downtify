@@ -29,6 +29,9 @@
       >
     </div>
 
+    <UiButton :to="{ name: 'AiGuard' }" icon="search" class="self-start">{{
+      t('recognition.guard.title')
+    }}</UiButton>
     <!-- No search button: Enter (like the main search) starts the mix. -->
     <form
       class="flex flex-col gap-2 sm:flex-row sm:items-end"
