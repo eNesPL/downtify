@@ -36,6 +36,11 @@ finds the actual musician, keeps your AMV audio and uses your approved identity
 for similar-song recommendations. Includes optional audio recognition,
 checkpointed library batches and reversible admin tag correction.
 
+[AI Music Guard](docs/features/ai-music-guard.md) filters known AI music from
+discovery and checks requested songs plus their selected YouTube versions
+before download. Includes evidence, account exceptions and per-track import
+reports; metadata checks do not guarantee human authorship.
+
 ## Overview
 
 Downtify is a self-hosted web app that turns Spotify and YouTube Music links into a tagged audio library. It never touches the Spotify API, and it needs no account and no Premium subscription. It also plays that library back, so what you download is one tab away from listening.
@@ -86,6 +91,8 @@ docker run -d -p 8000:8000 --name downtify \
 Open [http://localhost:8000](http://localhost:8000), sign in as **`admin`** / **`downtify`**, change that password in **Settings → General** (or turn accounts off with `DOWNTIFY_DISABLE_AUTH=true` on a server only you can reach), then paste a link and start the download. Replace `/path/to/downloads` with the folder where you want your music.
 
 `/downloads` holds your audio files and `/data` holds Downtify's database and settings. Keep both persistent, or settings, likes and playlist tracking are lost when the container is recreated.
+
+For this fork (AMV recognition and AI Music Guard), see [GHCR and Kubernetes deployment](deploy/kubernetes.md).
 
 ### Docker Compose
 

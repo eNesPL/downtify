@@ -155,6 +155,7 @@ export function useSimilar() {
       duration: item.duration || 0,
       url: item.url || '',
       match: item.match || 0,
+      ...(item.ai_guard ? { ai_guard: item.ai_guard } : {}),
     }))
   )
   return {

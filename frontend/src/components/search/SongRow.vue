@@ -75,6 +75,7 @@
       <AppIcon name="arrow-up-right" :size="16" />
     </a>
     <div class="flex w-40 shrink-0 items-center justify-end gap-2">
+      <AiGuardBadge :song="song" />
       <SimilarButton
         :source-url="song.url"
         :artist="firstArtist"
@@ -87,6 +88,7 @@
 </template>
 
 <script setup>
+import AiGuardBadge from '/src/components/library/AiGuardBadge.vue'
 // A search result: full playback on the cover (from the library, else
 // streamed) without downloading anything, and the wand next to the
 // download button, styled like it (as on Charts).

@@ -105,6 +105,11 @@ const routes = [
     component: () => import('/src/views/SimilarView.vue'),
   },
   {
+    path: '/ai-guard',
+    name: 'AiGuard',
+    component: () => import('/src/views/AiGuardView.vue'),
+  },
+  {
     path: '/recognize',
     name: 'Recognize',
     component: () => import('/src/views/RecognizeView.vue'),

@@ -156,6 +156,13 @@ export function useTrackActions() {
           }),
       },
       {
+        label: t('recognition.guard.title'),
+        icon: 'search',
+        hidden: !track.file || track.isPodcast,
+        action: () =>
+          router.push({ name: 'AiGuard', query: { file: track.file } }),
+      },
+      {
         label: t('recognition.menu'),
         icon: 'search',
         hidden: !track.file || track.isPodcast,
