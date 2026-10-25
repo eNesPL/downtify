@@ -117,6 +117,8 @@ import { useLibrary } from '/src/model/library'
 import { usePlayer } from '/src/model/player'
 import { usePlaylistActions } from '/src/model/playlistActions'
 import { useTrackActions } from '/src/model/trackActions'
+import { useVisibility } from '/src/model/visibility'
+import { useBuyLinks } from '/src/model/buyLinks'
 import { albumKey } from '/src/lib/library'
 import { formatBytes, splitLength } from '/src/lib/format'
 import { useI18n } from '/src/i18n'
@@ -128,6 +130,8 @@ const library = useLibrary()
 const player = usePlayer()
 const actions = useTrackActions()
 const playlistActions = usePlaylistActions()
+const visibility = useVisibility()
+const buyLinks = useBuyLinks()
 
 const ready = ref(false)
 
@@ -218,6 +222,13 @@ const menu = computed(() => [
     action: () => actions.downloadZip(album.value.tracks),
   },
   {
+    label: t('buy.menu'),
+    icon: 'tag',
+    hidden: !album.value?.artist,
+    action: () =>
+      buyLinks.open({ artist: album.value.artist, album: album.value.title }),
+  },
+  {
     label: t('album.searchMore'),
     icon: 'search',
     action: () =>
@@ -226,6 +237,7 @@ const menu = computed(() => [
         params: { query: `${album.value.artist} ${album.value.title}` },
       }),
   },
+  ...(album.value ? visibility.albumMenu(album.value) : []),
   { divider: true },
   {
     label: t('album.delete'),

@@ -2,8 +2,51 @@ import recognition from '../recognition.js'
 
 export default {
   recognition,
+  playlistNames: { restore: 'Restore source name' },
+  playlistFavorites: {
+    title: 'Playlists favoritas',
+    add: 'Añadir playlist a favoritos',
+    remove: 'Quitar playlist de favoritos',
+  },
+  externalPlaylistImport: {
+    open: 'Import folder playlists',
+    title: 'Playlists in your music folders',
+    hint: 'Select the playlists to add, up to 50 at a time. Only available tracks are referenced. Source files and audio are never changed.',
+    loading: 'Looking for playlist files…',
+    empty: 'No M3U or M3U8 playlist files found in the added folders.',
+    counts:
+      '{count} available · {missing} unavailable · {duplicates} repeated entries',
+    existing: 'Already added as {name}',
+    preview: 'Preview the first 30 tracks',
+    truncated: 'The scan reached its limit; this list is incomplete.',
+    add: 'Add selected playlists ({count})',
+    result:
+      '{added} added · {existing} already present · {failed} need a new preview or could not be imported',
+  },
   language: {
     name: 'Español',
+  },
+  buy: {
+    menu: 'Apoyar al artista',
+    title: 'Apoyar al artista',
+    body: 'Compra la música o visita la web del propio artista.',
+    inStore: 'Abrir en la tienda',
+    search: 'Buscar “{query}”',
+    website: 'Web oficial',
+    failed: 'No se pudo consultar las tiendas.',
+    note: 'Bandcamp entrega al artista la mayor parte de cada venta. Son enlaces normales: Downtify no vende nada ni gana nada con ellos.',
+  },
+  playlistSearch: {
+    placeholder: 'Buscar en esta playlist',
+    all: 'Todas',
+    missing: 'Faltan',
+    failed: 'Fallidas',
+    notInNavidrome: 'Fuera de Navidrome',
+    fromFolders: 'Tus carpetas',
+    unknownSource: 'Origen desconocido',
+    showing: '{count} de {total}',
+    noMatch: 'Nada coincide',
+    noMatchHint: 'Prueba con otras palabras u otro filtro.',
   },
   common: {
     cancel: 'Cancelar',
@@ -17,6 +60,7 @@ export default {
     seeAll: 'Ver todo',
     show: 'Mostrar',
     hide: 'Ocultar',
+    undo: 'Deshacer',
     unknownArtist: 'Artista desconocido',
     tracks: { one: '{count} canción', other: '{count} canciones' },
     albums: { one: '{count} álbum', other: '{count} álbumes' },
@@ -223,6 +267,11 @@ export default {
     },
     redownloadAll: 'Descargar todo de nuevo',
     downloadSelected: 'Descargar seleccionadas',
+    allHandled: 'Ya está en tu biblioteca o en la cola',
+    addPlaylist: 'Añadir a mis listas',
+    noAvailableTracks: 'Todavía no hay canciones descargadas para añadir.',
+    saveAvailableHint:
+      '{count} de {total} canciones disponibles. Se reutilizan los archivos de audio; no se descargarán las canciones que falten.',
     allInLibrary: 'Todo está en tu biblioteca',
     watchPlaylist: 'Vigilar canciones nuevas',
     watchArtist: 'Vigilar lanzamientos nuevos',
@@ -303,6 +352,19 @@ export default {
     sortArtist: 'Artista',
     sortYear: 'Año',
     sortTrackCount: 'Número de canciones',
+    trackSort: {
+      order: 'Orden de la lista',
+      addedNew: 'Añadidas recientemente',
+      addedOld: 'Añadidas hace más tiempo',
+      titleAsc: 'Título (A–Z)',
+      titleDesc: 'Título (Z–A)',
+      artistAsc: 'Artista (A–Z)',
+      artistDesc: 'Artista (Z–A)',
+      albumAsc: 'Álbum (A–Z)',
+      albumDesc: 'Álbum (Z–A)',
+      longest: 'Más largas primero',
+      shortest: 'Más cortas primero',
+    },
     viewGrid: 'Cuadrícula',
     viewList: 'Lista',
     emptyTitle: 'Tu biblioteca está vacía',
@@ -345,6 +407,28 @@ export default {
     failed: 'No se pudo actualizar el «me gusta»',
   },
   upgrade: {
+    chooseRecording: 'Choose a Deezer recording',
+    chooseRecordingHint:
+      'Review an exact recording when old album tags do not match. The artist and full title must still match.',
+    recordingLink: 'Deezer track link',
+    previewRecording: 'Preview',
+    recordingReviewHint:
+      'Review the album and duration. This prepares a single-track scan; replacement starts only after you confirm the scan.',
+    analyzeRecording: 'Analyze this choice',
+    recordingPreviewFailed: 'Unable to preview this Deezer track.',
+    replacementRescan: 'Options changed: scan again before starting.',
+    deemixTitle: 'Replace recordings with Deemix',
+    replaceAudio: 'Use verified Deemix recordings',
+    replaceAudioHint:
+      'Match the exact artist, title and album. Keep music in the Deemix folder. Ambiguous matches leave originals untouched. This scan replaces audio instead of retagging it.',
+    deleteOriginals: 'Remove old Downtify audio after import',
+    deleteOriginalsHint:
+      'Only remove each verified original after playlists, likes and playback references are updated. External files and sidecars are never removed.',
+    replacementProgress:
+      'Awaiting publication or cleanup: {pending}. Old copies removed: {removed}. Originals kept: {kept}.',
+    audio: 'Deemix recordings',
+    audioHint:
+      'Verify catalog duration and decoded audio before updating playlists and removing an old copy.',
     title: 'Mejorar biblioteca',
     subtitle:
       'Mejora la música que ya descargaste, en vez de descargarla otra vez.',
@@ -538,6 +622,19 @@ export default {
     },
     alreadyIn: 'Ya está en «{name}»',
     removedTrack: 'Quitada de “{name}”',
+    hideTrack: 'Ocultar de la playlist',
+    hiddenTrack: 'Oculta de “{name}”',
+    hiddenTitle: {
+      one: '{count} canción oculta',
+      other: '{count} canciones ocultas',
+    },
+    hiddenHint:
+      'Canciones que ocultaste de esta playlist. Siguen fuera cuando se sincroniza con su origen y siguen en tu biblioteca.',
+    hiddenGone: 'Ya no está en tu biblioteca',
+    unhide: 'Mostrar de nuevo',
+    unhidden: 'De vuelta en “{name}”',
+    unhiddenLater:
+      'Vuelve a “{name}” cuando la playlist descargue lo que le falta',
     created: 'Creada “{name}”',
     rename: 'Renombrar',
     renameTitle: 'Renombrar playlist',
@@ -737,6 +834,52 @@ export default {
     saved: 'Vigilancia actualizada',
     retargeted: 'Ahora vigilando {name}',
   },
+  sharing: {
+    title: 'Compartir “{name}”',
+    hint: 'Quienes la reciban pueden reproducirla, seguirla y guardar una copia, pero no modificarla.',
+    private: 'Privada',
+    privateHint: 'Solo tú puedes verla.',
+    shared: 'Personas concretas',
+    sharedHint: 'Elige quién puede verla.',
+    public: 'Pública',
+    publicHint: 'Todos en este servidor pueden verla.',
+    noOtherUsers: 'No hay otras cuentas con las que compartir.',
+    findUser: 'Buscar persona',
+    loadingUsers: 'Cargando personas…',
+    saved: {
+      private: '“{name}” vuelve a ser privada',
+      shared: '“{name}” compartida',
+      public: '“{name}” ahora es pública',
+    },
+    share: 'Compartir…',
+    new: 'Nueva',
+    following: 'Siguiendo',
+    follow: 'Seguir',
+    unfollow: 'Dejar de seguir',
+    followed: 'Siguiendo “{name}”',
+    unfollowed: 'Has dejado de seguir “{name}”',
+    saveCopy: 'Guardar una copia',
+    copied: 'Copia guardada como “{name}”',
+    open: 'Abrir',
+    detach: 'Desvincular del origen',
+    detachTitle: '¿Desvincular “{name}” de su origen?',
+    detachBody:
+      'Podrás añadir y quitar canciones. Las canciones se quedan como están, pero Downtify deja de mantener la lista sincronizada con Spotify o YouTube Music y elimina su vigilancia, si la tiene.',
+    detached: '“{name}” ya se puede editar',
+    by: 'de {owner}',
+    sharedWithCount: {
+      one: 'Compartida con {count} persona',
+      other: 'Compartida con {count} personas',
+    },
+    sharedWithMe: 'Compartidas conmigo',
+    sharedWithMeHint:
+      'Listas que otras personas han compartido contigo. Puedes reproducirlas, pero no modificarlas.',
+    publicPlaylists: 'Playlists públicas',
+    publicPlaylistsHint:
+      'Compartidas con todos en este servidor. Sigue una para tenerla en la barra lateral.',
+    navTitle: 'Compartidas contigo',
+    showMore: 'Mostrar {count} más',
+  },
   settings: {
     apps: 'Apps',
     title: 'Ajustes',
@@ -770,6 +913,13 @@ export default {
     showLyricsHint:
       'Desactívalo para ocultar el panel de letras, su botón y su atajo. Tus archivos conservan las letras y las descargas siguen buscándolas.',
     searchGroup: 'Búsqueda',
+    playlistsGroup: 'Playlists',
+    showPublicPlaylists: 'Mostrar playlists públicas',
+    showPublicPlaylistsHint:
+      'Muestra en la Biblioteca las playlists públicas de otras personas. Las que sigues siempre aparecen.',
+    allowPlaylistSharing: 'Permitir que los usuarios compartan playlists',
+    allowPlaylistSharingHint:
+      'Los usuarios pueden compartir sus playlists con otros o hacerlas públicas. Si se desactiva, todas las playlists compartidas quedan ocultas hasta que lo reactives.',
     searchAlbums: 'Mostrar álbumes en los resultados',
     searchAlbumsHint:
       'Buscar también álbumes, con la opción de descargar el álbum completo.',
@@ -787,6 +937,16 @@ export default {
     sourceYtmHint: 'Mejores coincidencias de metadatos',
     sourceYt: 'YouTube',
     sourceYtHint: 'Alternativa para canciones que faltan en YouTube Music',
+    deemixTitle: 'Deemix',
+    deemixHint:
+      'Download from your own Deemix server. Requested quality requires the matching Deezer entitlement.',
+    deemixEnabled: 'Use Deemix',
+    deemixInPlace:
+      'Keep audio, artwork and lyrics in the shared Deemix folder, without rewriting its tags. Configure a private ARL file on the server; do not paste it here.',
+    deemixUrl: 'Deemix server URL',
+    deemixRemote: 'Download folder inside Deemix',
+    deemixLocal: 'Same folder inside Downtify (read-only is supported)',
+    deemixQuality: 'Audio quality',
     slskdTitle: 'slskd',
     slskdHint:
       'Descarga de Soulseek a través de tu servidor slskd. Lo que no encuentre pasa a la siguiente fuente.',
@@ -898,6 +1058,10 @@ export default {
     navidromeAdminHint:
       'Opcional — permite a Downtify iniciar un escaneo para que las canciones nuevas aparezcan antes.',
     test: {
+      connection_not_deemix: 'The server is not a compatible Deemix instance.',
+      quality_unavailable:
+        'The Deezer account cannot stream the requested quality.',
+
       button: 'Probar conexión',
       testing: 'Probando…',
       needFields: 'Rellena primero los campos de arriba.',
@@ -939,6 +1103,9 @@ export default {
     navidromeSyncHint:
       'Tras descargar playlists y comprobaciones del monitor, mantiene una playlist con el mismo nombre en Navidrome.',
     navidromePublic: 'Hacer públicas las playlists de Navidrome',
+    primaryLibrary: 'Primary library folder',
+    primaryLibraryHint:
+      'Prefer this folder for matching artist, song and album. Files and saved playlist paths are preserved; nothing is deleted.',
     libraryGroup: 'Biblioteca',
     coverCache: 'Caché de portadas',
     coverCacheHint:
@@ -1043,6 +1210,7 @@ export default {
     lyrics: 'Letra',
     queue: 'A continuación',
     search: 'Buscar',
+    findInPlaylist: 'Buscar en la playlist (en su página)',
     goLibrary: 'Ir a la biblioteca',
     goQueue: 'Ir a la cola',
     close: 'Cerrar reproducción actual',
@@ -1188,6 +1356,32 @@ export default {
     later: 'Más tarde',
     changePassword: 'Cambiar contraseña',
   },
+  visibility: {
+    hide: 'Ocultar a los usuarios',
+    show: 'Mostrar a los usuarios',
+    hiddenShort: 'Oculto',
+    hidden: {
+      one: 'Oculto para los usuarios',
+      other: '{count} elementos ocultos para los usuarios',
+    },
+    shown: {
+      one: 'Visible para los usuarios',
+      other: '{count} elementos visibles para los usuarios',
+    },
+    hiddenBy: {
+      track: 'Oculta para los usuarios',
+      album: 'Oculta para los usuarios junto con su álbum',
+      artist: 'Oculta para los usuarios junto con su artista',
+    },
+    title: 'Oculto para los usuarios',
+    hint: 'Todos ven todas las canciones descargadas. Lo que ocultes aquí no lo ven los usuarios; los administradores siguen viéndolo todo. Oculta canciones, álbumes o artistas desde la Biblioteca.',
+    none: 'No hay nada oculto. Usa «Ocultar a los usuarios» en una canción, álbum o artista de la Biblioteca.',
+    group: {
+      artists: 'Artistas',
+      albums: 'Álbumes',
+      tracks: 'Canciones',
+    },
+  },
   users: {
     title: 'Usuarios',
     hint: 'Quién puede iniciar sesión en este servidor. Los admins pueden cambiarlo todo; los usuarios pueden escuchar, buscar, descargar y cambiar su propia cuenta.',
@@ -1255,6 +1449,8 @@ export default {
       unlike: 'Me gusta quitados',
       delete: 'Archivos eliminados',
       audio_replaced: 'Audios reemplazados',
+      library_hidden: 'Elementos ocultos a los usuarios',
+      library_shown: 'Elementos mostrados a los usuarios',
       device_paired: 'Apps vinculadas',
       device_unpaired: 'Apps desvinculadas',
       user_created: 'Usuarios añadidos',
@@ -1273,6 +1469,8 @@ export default {
       unlike: 'quitó el me gusta a {what}',
       delete: 'eliminó {what}',
       audio_replaced: 'reemplazó el audio de {what}',
+      library_hidden: 'ocultó {what} a los usuarios',
+      library_shown: 'mostró {what} a los usuarios',
       device_paired: 'vinculó {what}',
       device_unpaired: 'desvinculó {what}',
       user_created: 'añadió al usuario {what}',
@@ -1418,6 +1616,11 @@ export default {
     deleted: {
       one: 'Canción eliminada',
       other: '{count} canciones eliminadas',
+    },
+    releasedShared: {
+      one: '{count} canción sigue en la biblioteca compartida (otra persona también la descargó)',
+      other:
+        '{count} canciones siguen en la biblioteca compartida (otras personas también las descargaron)',
     },
     deletePartial: {
       one: 'No se pudo eliminar {count} archivo',

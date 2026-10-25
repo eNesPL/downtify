@@ -415,6 +415,15 @@ function getLibraryArtists() {
   return API.get('/api/library/artists')
 }
 
+// What admins hid from users (downtify/library_visibility.py).
+function getLibraryVisibility() {
+  return API.get('/api/library/visibility')
+}
+
+function updateLibraryVisibility(action, items) {
+  return API.post('/api/library/visibility', { action, items })
+}
+
 function lookupLibrarySongs(songs) {
   return API.post('/api/library/lookup', { songs })
 }
@@ -452,15 +461,87 @@ function createLibraryPlaylist(name) {
   return API.post('/api/library/playlists', { name })
 }
 
-function editLibraryPlaylistTracks(name, { add = [], remove = [] } = {}) {
-  return API.post('/api/library/playlists/tracks', { name, add, remove })
+function discoverExternalPlaylists() {
+  return API.get('/api/library/playlists/external')
 }
 
-function renameLibraryPlaylist(name, newName) {
+function importExternalPlaylists(selected) {
+  return API.post('/api/library/playlists/external', { selected })
+}
+
+function editLibraryPlaylistTracks(
+  name,
+  { add = [], remove = [], sourcePlaylistUrl = '' } = {}
+) {
+  return API.post('/api/library/playlists/tracks', {
+    name,
+    add,
+    remove,
+    ...(sourcePlaylistUrl ? { source_playlist_url: sourcePlaylistUrl } : {}),
+  })
+}
+
+function renameLibraryPlaylist(name, newName, resetDisplayName = false) {
   return API.post('/api/library/playlists/rename', {
     name,
     new_name: newName,
+    reset_display_name: resetDisplayName,
   })
+}
+
+function setPlaylistVisibility(name, visibility, sharedWith = []) {
+  return API.put('/api/library/playlists/visibility', {
+    name,
+    visibility,
+    shared_with: sharedWith,
+  })
+}
+
+function setPlaylistFavorite(name, favorite) {
+  return API.put('/api/library/playlists/favorite', { name, favorite })
+}
+
+function copyLibraryPlaylist(name, newName = '') {
+  return API.post('/api/library/playlists/copy', {
+    name,
+    new_name: newName,
+  })
+}
+
+function detachLibraryPlaylist(name) {
+  return API.post('/api/library/playlists/detach', { name })
+}
+
+// What the playlist page filters by: who fetched each song and which ones
+// Navidrome hasn't matched - see downtify/file_providers.py.
+function getPlaylistDetails(name) {
+  return API.get('/api/library/playlists/details', { params: { name } })
+}
+
+// Songs hidden from an imported playlist (they stay out when its watch
+// or link brings them back).
+function getHiddenPlaylistSongs(name) {
+  return API.get('/api/library/playlists/hidden', { params: { name } })
+}
+
+function changeHiddenPlaylistSongs(name, { hide = [], show = [] } = {}) {
+  return API.post('/api/library/playlists/hidden', { name, hide, show })
+}
+
+function followPlaylist(name) {
+  return API.post('/api/v1/playlists/follow', { name })
+}
+
+function unfollowPlaylist(name) {
+  return API.delete('/api/v1/playlists/follow', { params: { name } })
+}
+
+function markPlaylistSeen(name) {
+  return API.post('/api/v1/playlists/seen', { name })
+}
+
+function listShareableUsernames() {
+  return API.get('/api/v1/usernames')
 }
 
 function reconcileLibrary() {
@@ -631,6 +712,12 @@ function findPreview({ artist, title, duration }) {
   return API.get('/api/preview', { params: { artist, title, duration } })
 }
 
+// Where to buy a song (`title`), an album or an artist's music, in the
+// `country` store - see downtify/buy_links.py.
+function getBuyLinks({ artist, title = '', album = '', country = '' }) {
+  return API.get('/api/buy', { params: { artist, title, album, country } })
+}
+
 // Albums and playlists in two answers: Deezer's first (quick), then what
 // Spotify adds, matched to Deezer - see downtify/discover.py.
 function getDiscoverDeezerCollections(payload) {
@@ -790,6 +877,10 @@ function suggestDirs(path) {
 
 // Try an integration with the values as they are in the form, saved or
 // not. A failed test is still a 200: the answer says what's wrong.
+function testDeemix(config) {
+  return API.post('/api/deemix/test', config)
+}
+
 function testSlskd(config) {
   return API.post('/api/slskd/test', config)
 }
@@ -866,14 +957,29 @@ export default {
   getLibrarySummary,
   getLibraryAlbums,
   getLibraryArtists,
+  getLibraryVisibility,
+  updateLibraryVisibility,
   lookupLibrarySongs,
   getLyrics,
   deleteDownload,
   deleteDownloadsBatch,
   deleteLibraryPlaylist,
   createLibraryPlaylist,
+  discoverExternalPlaylists,
+  importExternalPlaylists,
   editLibraryPlaylistTracks,
   renameLibraryPlaylist,
+  setPlaylistVisibility,
+  setPlaylistFavorite,
+  copyLibraryPlaylist,
+  detachLibraryPlaylist,
+  getPlaylistDetails,
+  getHiddenPlaylistSongs,
+  changeHiddenPlaylistSongs,
+  followPlaylist,
+  unfollowPlaylist,
+  markPlaylistSeen,
+  listShareableUsernames,
   prepareLibraryArchive,
   libraryArchiveURL,
   reconcileLibrary,
@@ -919,6 +1025,7 @@ export default {
   getDiscoverDeezerCollections,
   getDiscoverSpotifyCollections,
   findPreview,
+  getBuyLinks,
   recordListen,
   clearListens,
   getBlockedArtists,
@@ -951,6 +1058,7 @@ export default {
   suggestDirs,
   setSettings,
   testSlskd,
+  testDeemix,
   testNavidrome,
   getCookiesStatus,
   uploadCookies,

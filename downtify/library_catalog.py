@@ -8,13 +8,15 @@ import unicodedata
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
+from .catalog_worker import fold_library_entries
 from .library_cache_keys import file_content_key_from_name_and_size
 from .library_metadata import library_entry_for_file
 from .library_metadata_cache import LibraryMetadataCache
 from .library_paths import (
     ResolvedLibraryRoots,
+    extra_dir_id,
     library_stored_path,
     locate_library_file,
 )
@@ -29,6 +31,9 @@ from .library_paths_cache import (
 )
 from .playlist_catalog import PlaylistCatalog
 from .track_index import TrackIndex
+
+if TYPE_CHECKING:
+    from .library_visibility import HiddenRules
 
 AUDIO_EXTENSIONS = frozenset({
     '.mp3',
@@ -49,6 +54,7 @@ class LibraryContext:
     track_index: Optional[TrackIndex] = None
     metadata_cache: Optional[LibraryMetadataCache] = None
     playlist_catalog: Optional[PlaylistCatalog] = None
+    primary_extra_id: str = ''
 
 
 def library_context_from_state(
@@ -69,7 +75,17 @@ def library_context_from_state(
     extra_dirs = extra_dirs_from_settings(
         settings, Path(download_dir), slskd_dir
     )
+    external = settings.get('external_library')
+    primary = (
+        str(external.get('primary_folder') or '')
+        if isinstance(external, dict)
+        else ''
+    )
+    primary_id = next(
+        (extra_dir_id(root) for root in extra_dirs if str(root) == primary), ''
+    )
     return LibraryContext(
+        primary_extra_id=primary_id,
         download_dir=Path(download_dir),
         slskd_dir=slskd_dir,
         extra_dirs=extra_dirs,
@@ -369,6 +385,13 @@ def merge_library_listing_file(ctx: LibraryContext, stored: str) -> None:
     later, after the download queue is idle.
     """
 
+    with listing_lock():
+        _merge_library_listing_file(ctx, stored)
+
+
+def _merge_library_listing_file(ctx: LibraryContext, stored: str) -> None:
+    """Read/modify/publish under the writer lock, never the UI read lock."""
+
     name = str(stored or '').strip().replace('\\', '/')
     if not name:
         return
@@ -390,13 +413,11 @@ def merge_library_listing_file(ctx: LibraryContext, stored: str) -> None:
         rows = [library_entry_for_file(name, full)]
     if not rows:
         return
-    from .external_library import finish_library_entries  # noqa: PLC0415
-
-    merged = finish_library_entries([*peeked, *rows])
+    merged = fold_library_entries([*peeked, *rows])
     paths = peek_cached_path_pairs(ctx) or []
     if not any(str(item[0]) == name for item in paths):
         paths = [*paths, (name, str(full))]
-    store_cached_track_entries(ctx, merged, paths=paths)
+    store_cached_track_entries(ctx, merged, paths=paths, provisional=True)
 
 
 def drop_library_listing_files(
@@ -408,6 +429,13 @@ def drop_library_listing_files(
     later, after the download queue is idle.
     """
 
+    with listing_lock():
+        _drop_library_listing_files(ctx, stored_paths)
+
+
+def _drop_library_listing_files(
+    ctx: LibraryContext, stored_paths: Sequence[str]
+) -> None:
     names = {
         str(item or '').strip().replace('\\', '/') for item in stored_paths
     }
@@ -429,7 +457,7 @@ def drop_library_listing_files(
         for item in (peek_cached_path_pairs(ctx) or [])
         if str(item[0]).replace('\\', '/') not in names
     ]
-    store_cached_track_entries(ctx, kept, paths=paths)
+    store_cached_track_entries(ctx, kept, paths=paths, provisional=True)
 
 
 def entry_content_key(entry: dict[str, Any]) -> str:
@@ -487,11 +515,11 @@ def list_library_entries(
             _attach_m3u_playlists_to_entries(entries, ctx)
         if not fold_extra:
             return entries
-        from .external_library import (  # noqa: PLC0415  # import cycle
-            finish_library_entries,
+        entries = (
+            fold_library_entries(entries, ctx.primary_extra_id)
+            if ctx.primary_extra_id
+            else fold_library_entries(entries)
         )
-
-        entries = finish_library_entries(entries)
         store_cached_track_entries(ctx, entries, paths=path_rows)
         return _filter_entries(entries, allowed_keys)
 
@@ -693,8 +721,14 @@ def library_album_index(
     ctx: LibraryContext,
     *,
     allowed_keys: Optional[Collection[str]] = None,
+    hidden: Optional[HiddenRules] = None,
 ) -> list[dict[str, Any]]:
-    """Albums for the Library grid: counts and a cover file, not every track."""
+    """Albums for the Library grid: counts and a cover file, not every track.
+
+    ``hidden`` (an admin's view, see :mod:`downtify.library_visibility`)
+    marks albums hidden from other users with ``hidden_by`` (``album`` or
+    ``artist``); they stay in the list.
+    """
 
     grouped = _group_albums(
         listing_for_request(ctx, allowed_keys=allowed_keys)
@@ -710,7 +744,7 @@ def library_album_index(
             size += int(track.get('size') or 0)
             if not cover_file and track.get('has_cover'):
                 cover_file = str(track.get('file') or '')
-        rows.append({
+        row = {
             'title': bucket['title'],
             'artist': bucket['artist'],
             'year': bucket['year'],
@@ -719,7 +753,12 @@ def library_album_index(
             'size': size,
             'track_count': len(tracks),
             'cover_file': cover_file,
-        })
+        }
+        if hidden:
+            reason = hidden.album_reason(bucket['artist'], bucket['title'])
+            if reason:
+                row['hidden_by'] = reason
+        rows.append(row)
     rows.sort(
         key=lambda row: (-int(row['added']), str(row['title']).casefold())
     )
@@ -731,8 +770,13 @@ def library_artist_index(
     liked_paths: Optional[set[str]] = None,
     *,
     allowed_keys: Optional[Collection[str]] = None,
+    hidden: Optional[HiddenRules] = None,
 ) -> list[dict[str, Any]]:
-    """Artists for the Library grid and Discover, without every track row."""
+    """Artists for the Library grid and Discover, without every track row.
+
+    ``hidden`` (an admin's view) marks artists hidden from other users
+    with ``hidden_by: 'artist'``; they stay in the list.
+    """
 
     liked = liked_paths or set()
     artists: dict[str, dict[str, Any]] = {}
@@ -771,6 +815,8 @@ def library_artist_index(
     for bucket in artists.values():
         album_keys = bucket.pop('_albums')
         bucket['album_count'] = len(album_keys)
+        if hidden and hidden.artist_hidden(bucket['name']):
+            bucket['hidden_by'] = 'artist'
         rows.append(bucket)
     rows.sort(key=lambda row: str(row['name']).casefold())
     return rows

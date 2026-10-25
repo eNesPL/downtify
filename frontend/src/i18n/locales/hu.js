@@ -2,8 +2,51 @@ import recognition from '../recognition.js'
 
 export default {
   recognition,
+  playlistNames: { restore: 'Restore source name' },
+  playlistFavorites: {
+    title: 'Kedvenc lejátszási listák',
+    add: 'Lista hozzáadása a kedvencekhez',
+    remove: 'Lista eltávolítása a kedvencekből',
+  },
+  externalPlaylistImport: {
+    open: 'Import folder playlists',
+    title: 'Playlists in your music folders',
+    hint: 'Select the playlists to add, up to 50 at a time. Only available tracks are referenced. Source files and audio are never changed.',
+    loading: 'Looking for playlist files…',
+    empty: 'No M3U or M3U8 playlist files found in the added folders.',
+    counts:
+      '{count} available · {missing} unavailable · {duplicates} repeated entries',
+    existing: 'Already added as {name}',
+    preview: 'Preview the first 30 tracks',
+    truncated: 'The scan reached its limit; this list is incomplete.',
+    add: 'Add selected playlists ({count})',
+    result:
+      '{added} added · {existing} already present · {failed} need a new preview or could not be imported',
+  },
   language: {
     name: 'Magyar',
+  },
+  buy: {
+    menu: 'Az előadó támogatása',
+    title: 'Az előadó támogatása',
+    body: 'Vásárold meg a zenét, vagy látogasd meg az előadó saját weboldalát.',
+    inStore: 'Megnyitás a boltban',
+    search: 'Keresés: „{query}”',
+    website: 'Hivatalos weboldal',
+    failed: 'Nem sikerült lekérdezni a boltokat.',
+    note: 'A Bandcamp minden eladás nagy részét az előadónak adja. Ezek egyszerű linkek: a Downtify nem árul semmit, és nem keres rajtuk.',
+  },
+  playlistSearch: {
+    placeholder: 'Keresés ebben a listában',
+    all: 'Mind',
+    missing: 'Hiányzó',
+    failed: 'Sikertelen',
+    notInNavidrome: 'Nincs a Navidrome-ban',
+    fromFolders: 'A mappáid',
+    unknownSource: 'Ismeretlen forrás',
+    showing: '{count} / {total}',
+    noMatch: 'Nincs találat',
+    noMatchHint: 'Próbálj más szavakat vagy másik szűrőt.',
   },
   common: {
     cancel: 'Mégse',
@@ -17,6 +60,7 @@ export default {
     seeAll: 'Összes',
     show: 'Megjelenítés',
     hide: 'Elrejtés',
+    undo: 'Visszavonás',
     unknownArtist: 'Ismeretlen előadó',
     tracks: { one: '{count} szám', other: '{count} szám' },
     albums: { one: '{count} album', other: '{count} album' },
@@ -220,6 +264,11 @@ export default {
     downloadNew: { one: '{count} új letöltése', other: '{count} új letöltése' },
     redownloadAll: 'Összes újratöltése',
     downloadSelected: 'Kijelöltek letöltése',
+    allHandled: 'Már a könyvtárban vagy a sorban',
+    addPlaylist: 'Hozzáadás a lejátszási listáimhoz',
+    noAvailableTracks: 'Még nincsenek hozzáadható letöltött számok.',
+    saveAvailableHint:
+      '{count} elérhető szám a(z) {total} számból. A meglévő hangfájlokat használjuk; a hiányzó számokat nem töltjük le.',
     allInLibrary: 'Mind a könyvtárban van',
     watchPlaylist: 'Új számok figyelése',
     watchArtist: 'Új kiadások figyelése',
@@ -304,6 +353,19 @@ export default {
     sortArtist: 'Előadó',
     sortYear: 'Év',
     sortTrackCount: 'Számok száma',
+    trackSort: {
+      order: 'Lejátszási lista sorrendje',
+      addedNew: 'Nemrég hozzáadott',
+      addedOld: 'Régen hozzáadott',
+      titleAsc: 'Cím (A–Z)',
+      titleDesc: 'Cím (Z–A)',
+      artistAsc: 'Előadó (A–Z)',
+      artistDesc: 'Előadó (Z–A)',
+      albumAsc: 'Album (A–Z)',
+      albumDesc: 'Album (Z–A)',
+      longest: 'Leghosszabb elöl',
+      shortest: 'Legrövidebb elöl',
+    },
     viewGrid: 'Rács',
     viewList: 'Lista',
     emptyTitle: 'A könyvtárad üres',
@@ -342,6 +404,28 @@ export default {
     failed: 'A kedvelést nem sikerült frissíteni',
   },
   upgrade: {
+    chooseRecording: 'Choose a Deezer recording',
+    chooseRecordingHint:
+      'Review an exact recording when old album tags do not match. The artist and full title must still match.',
+    recordingLink: 'Deezer track link',
+    previewRecording: 'Preview',
+    recordingReviewHint:
+      'Review the album and duration. This prepares a single-track scan; replacement starts only after you confirm the scan.',
+    analyzeRecording: 'Analyze this choice',
+    recordingPreviewFailed: 'Unable to preview this Deezer track.',
+    replacementRescan: 'Options changed: scan again before starting.',
+    deemixTitle: 'Replace recordings with Deemix',
+    replaceAudio: 'Use verified Deemix recordings',
+    replaceAudioHint:
+      'Match the exact artist, title and album. Keep music in the Deemix folder. Ambiguous matches leave originals untouched. This scan replaces audio instead of retagging it.',
+    deleteOriginals: 'Remove old Downtify audio after import',
+    deleteOriginalsHint:
+      'Only remove each verified original after playlists, likes and playback references are updated. External files and sidecars are never removed.',
+    replacementProgress:
+      'Awaiting publication or cleanup: {pending}. Old copies removed: {removed}. Originals kept: {kept}.',
+    audio: 'Deemix recordings',
+    audioHint:
+      'Verify catalog duration and decoded audio before updating playlists and removing an old copy.',
     title: 'Könyvtár feljavítása',
     subtitle:
       'Javítsd fel a már letöltött zenéket, ahelyett hogy újra letöltenéd őket.',
@@ -537,6 +621,19 @@ export default {
     },
     alreadyIn: 'Már benne van: „{name}”',
     removedTrack: 'Eltávolítva: „{name}”',
+    hideTrack: 'Elrejtés a listáról',
+    hiddenTrack: 'Elrejtve: „{name}”',
+    hiddenTitle: {
+      one: '{count} elrejtett szám',
+      other: '{count} elrejtett szám',
+    },
+    hiddenHint:
+      'A listáról elrejtett számaid. Kimaradnak, amikor a lista szinkronizál a forrásával, és a könyvtáradban maradnak.',
+    hiddenGone: 'Már nincs a könyvtáradban',
+    unhide: 'Megjelenítés újra',
+    unhidden: 'Újra itt: „{name}”',
+    unhiddenLater:
+      'Visszakerül ide: „{name}”, amikor a lista letölti, ami hiányzik belőle',
     created: 'Létrehozva: „{name}”',
     rename: 'Átnevezés',
     renameTitle: 'Lista átnevezése',
@@ -736,6 +833,52 @@ export default {
     saved: 'Figyelés frissítve',
     retargeted: 'Most figyelve: {name}',
   },
+  sharing: {
+    title: '„{name}” megosztása',
+    hint: 'Akikkel megosztod, lejátszhatják, követhetik és másolatot menthetnek róla, de nem módosíthatják.',
+    private: 'Privát',
+    privateHint: 'Csak te látod.',
+    shared: 'Meghatározott személyek',
+    sharedHint: 'Válaszd ki, kik láthatják.',
+    public: 'Nyilvános',
+    publicHint: 'Ezen a szerveren mindenki látja.',
+    noOtherUsers: 'Nincs más fiók, akivel megosztható.',
+    findUser: 'Személy keresése',
+    loadingUsers: 'Személyek betöltése…',
+    saved: {
+      private: '„{name}” ismét privát',
+      shared: '„{name}” megosztva',
+      public: '„{name}” mostantól nyilvános',
+    },
+    share: 'Megosztás…',
+    new: 'Új',
+    following: 'Követve',
+    follow: 'Követés',
+    unfollow: 'Követés megszüntetése',
+    followed: 'Követed: „{name}”',
+    unfollowed: 'Már nem követed: „{name}”',
+    saveCopy: 'Másolat mentése',
+    copied: 'Másolat mentve ezen a néven: „{name}”',
+    open: 'Megnyitás',
+    detach: 'Leválasztás a forrásról',
+    detachTitle: 'Leválasztod a(z) „{name}” listát a forrásáról?',
+    detachBody:
+      'Ezután számokat adhatsz hozzá és vehetsz el. A számok maradnak, de a Downtify már nem tartja szinkronban a listát a Spotify-jal vagy a YouTube Musickal, és törli a figyelését, ha volt.',
+    detached: 'A(z) „{name}” mostantól szerkeszthető',
+    by: '{owner} listája',
+    sharedWithCount: {
+      one: '{count} személlyel megosztva',
+      other: '{count} személlyel megosztva',
+    },
+    sharedWithMe: 'Velem megosztott',
+    sharedWithMeHint:
+      'Mások által veled megosztott listák. Lejátszhatod őket, de nem módosíthatod.',
+    publicPlaylists: 'Nyilvános listák',
+    publicPlaylistsHint:
+      'A szerver mindenkivel megosztva. Kövess egyet, hogy az oldalsávban maradjon.',
+    navTitle: 'Veled megosztott',
+    showMore: '{count} további megjelenítése',
+  },
   settings: {
     apps: 'Alkalmazások',
     title: 'Beállítások',
@@ -769,6 +912,13 @@ export default {
     showLyricsHint:
       'Kikapcsolva elrejti a dalszöveg panelt, a gombját és a billentyűparancsát. A fájlok megtartják a dalszövegeket, a letöltések pedig továbbra is lekérik őket.',
     searchGroup: 'Keresés',
+    playlistsGroup: 'Lejátszási listák',
+    showPublicPlaylists: 'Nyilvános listák megjelenítése',
+    showPublicPlaylistsHint:
+      'Mások nyilvános listáit is felsorolja a Könyvtárban. A követett listák mindig látszanak.',
+    allowPlaylistSharing: 'Felhasználók listamegosztásának engedélyezése',
+    allowPlaylistSharingHint:
+      'A felhasználók megoszthatják listáikat másokkal, vagy nyilvánossá tehetik azokat. Kikapcsolva minden megosztott lista rejtve marad, amíg vissza nem kapcsolod.',
     searchAlbums: 'Albumok a találatok között',
     searchAlbumsHint:
       'Albumokat is keres, és felkínálja a teljes album letöltését.',
@@ -786,6 +936,16 @@ export default {
     sourceYtmHint: 'Legjobb metaadat-egyezések',
     sourceYt: 'YouTube',
     sourceYtHint: 'Tartalék a YouTube Musicból hiányzó dalokhoz',
+    deemixTitle: 'Deemix',
+    deemixHint:
+      'Download from your own Deemix server. Requested quality requires the matching Deezer entitlement.',
+    deemixEnabled: 'Use Deemix',
+    deemixInPlace:
+      'Keep audio, artwork and lyrics in the shared Deemix folder, without rewriting its tags. Configure a private ARL file on the server; do not paste it here.',
+    deemixUrl: 'Deemix server URL',
+    deemixRemote: 'Download folder inside Deemix',
+    deemixLocal: 'Same folder inside Downtify (read-only is supported)',
+    deemixQuality: 'Audio quality',
     slskdTitle: 'slskd',
     slskdHint:
       'Letöltés a Soulseekről a slskd szervereden át. A nem talált számok a következő forráshoz kerülnek.',
@@ -895,6 +1055,10 @@ export default {
     navidromeAdminHint:
       'Nem kötelező — a Downtify könyvtárvizsgálatot indíthat, hogy az új dalok hamarabb megjelenjenek.',
     test: {
+      connection_not_deemix: 'The server is not a compatible Deemix instance.',
+      quality_unavailable:
+        'The Deezer account cannot stream the requested quality.',
+
       button: 'Kapcsolat tesztelése',
       testing: 'Tesztelés…',
       needFields: 'Előbb töltsd ki a fenti mezőket.',
@@ -936,6 +1100,9 @@ export default {
     navidromeSyncHint:
       'Listaletöltések és figyelő-ellenőrzések után azonos nevű listát tart fenn a Navidrome-ban.',
     navidromePublic: 'Navidrome listák nyilvánossá tétele',
+    primaryLibrary: 'Primary library folder',
+    primaryLibraryHint:
+      'Prefer this folder for matching artist, song and album. Files and saved playlist paths are preserved; nothing is deleted.',
     libraryGroup: 'Könyvtár',
     coverCache: 'Borítók gyorsítótárazása',
     coverCacheHint:
@@ -1040,6 +1207,7 @@ export default {
     lyrics: 'Dalszöveg',
     queue: 'Következik',
     search: 'Keresés',
+    findInPlaylist: 'Keresés a listában (a lista oldalán)',
     goLibrary: 'Ugrás a könyvtárhoz',
     goQueue: 'Ugrás a sorhoz',
     close: 'Most szóló bezárása',
@@ -1185,6 +1353,32 @@ export default {
     later: 'Később',
     changePassword: 'Jelszó módosítása',
   },
+  visibility: {
+    hide: 'Elrejtés a felhasználók elől',
+    show: 'Megjelenítés a felhasználóknak',
+    hiddenShort: 'Rejtett',
+    hidden: {
+      one: 'Elrejtve a felhasználók elől',
+      other: '{count} elem elrejtve a felhasználók elől',
+    },
+    shown: {
+      one: 'Megjelenítve a felhasználóknak',
+      other: '{count} elem megjelenítve a felhasználóknak',
+    },
+    hiddenBy: {
+      track: 'Elrejtve a felhasználók elől',
+      album: 'Az albumával együtt elrejtve a felhasználók elől',
+      artist: 'Az előadójával együtt elrejtve a felhasználók elől',
+    },
+    title: 'Elrejtve a felhasználók elől',
+    hint: 'Mindenki látja az összes letöltött dalt. Amit itt elrejtesz, azt a felhasználók nem látják; az adminok továbbra is mindent látnak. Dalokat, albumokat vagy előadókat a Könyvtárból rejthetsz el.',
+    none: 'Semmi sincs elrejtve. Használd az „Elrejtés a felhasználók elől” lehetőséget egy dalnál, albumnál vagy előadónál a Könyvtárban.',
+    group: {
+      artists: 'Előadók',
+      albums: 'Albumok',
+      tracks: 'Dalok',
+    },
+  },
   users: {
     title: 'Felhasználók',
     hint: 'Kik jelentkezhetnek be erre a szerverre. Az adminok mindent módosíthatnak; a felhasználók hallgathatnak, kereshetnek, letölthetnek és a saját fiókjukat módosíthatják.',
@@ -1255,6 +1449,8 @@ export default {
       unlike: 'Visszavont kedvelések',
       delete: 'Törölt fájlok',
       audio_replaced: 'Lecserélt hangok',
+      library_hidden: 'A felhasználók elől elrejtett elemek',
+      library_shown: 'A felhasználóknak megjelenített elemek',
       device_paired: 'Párosított alkalmazások',
       device_unpaired: 'Leválasztott alkalmazások',
       user_created: 'Új felhasználók',
@@ -1273,6 +1469,8 @@ export default {
       unlike: 'visszavonta a kedvelést: {what}',
       delete: 'törölte: {what}',
       audio_replaced: 'lecserélte ennek a hangját: {what}',
+      library_hidden: 'elrejtette a felhasználók elől: {what}',
+      library_shown: 'megjelenítette a felhasználóknak: {what}',
       device_paired: 'párosította: {what}',
       device_unpaired: 'leválasztotta: {what}',
       user_created: 'felhasználót adott hozzá: {what}',
@@ -1416,6 +1614,11 @@ export default {
       other: '{count} szám hozzáadva a sorhoz',
     },
     deleted: { one: 'Szám törölve', other: '{count} szám törölve' },
+    releasedShared: {
+      one: '{count} dal a megosztott könyvtárban marad (más is letöltötte)',
+      other:
+        '{count} dal a megosztott könyvtárban marad (más is letöltötte őket)',
+    },
     deletePartial: {
       one: '{count} fájlt nem sikerült törölni',
       other: '{count} fájlt nem sikerült törölni',

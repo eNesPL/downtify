@@ -103,6 +103,17 @@
                 />
               </SettingRow>
             </SettingGroup>
+            <SettingGroup :title="t('settings.playlistsGroup')">
+              <SettingRow
+                :label="t('settings.showPublicPlaylists')"
+                :description="t('settings.showPublicPlaylistsHint')"
+              >
+                <UiSwitch
+                  v-model="account.showPublicPlaylists.value"
+                  :aria-label="t('settings.showPublicPlaylists')"
+                />
+              </SettingRow>
+            </SettingGroup>
             <SettingGroup :title="t('settings.searchGroup')">
               <SettingRow
                 :label="t('settings.searchAlbums')"
@@ -139,6 +150,7 @@
               <SourceOrder
                 v-model="s.audio_providers"
                 @enable-slskd="s.slskd.enabled = true"
+                @enable-deemix="s.deemix.enabled = true"
               />
             </SettingGroup>
 
@@ -212,6 +224,61 @@
                     :aria-label="t('settings.slskdInPlace')"
                   />
                 </SettingRow>
+              </template>
+            </SettingGroup>
+
+            <SettingGroup
+              :title="t('settings.deemixTitle')"
+              :description="t('settings.deemixHint')"
+            >
+              <SettingRow
+                :label="t('settings.deemixEnabled')"
+                :description="t('settings.deemixInPlace')"
+              >
+                <UiSwitch
+                  v-model="s.deemix.enabled"
+                  :aria-label="t('settings.deemixEnabled')"
+                />
+              </SettingRow>
+              <template v-if="s.deemix.enabled">
+                <div class="grid gap-4 px-5 py-4 sm:grid-cols-2">
+                  <UiInput
+                    v-model.trim="s.deemix.base_url"
+                    :label="t('settings.deemixUrl')"
+                    placeholder="http://deemix:6595"
+                    type="url"
+                  />
+                  <UiInput
+                    v-model.trim="s.deemix.remote_dir"
+                    :label="t('settings.deemixRemote')"
+                    placeholder="/downloads"
+                    mono
+                  />
+                  <UiInput
+                    v-model.trim="s.deemix.source_dir"
+                    :label="t('settings.deemixLocal')"
+                    placeholder="/deemix"
+                    mono
+                  />
+                  <label class="grid gap-2 text-sm"
+                    >{{ t('settings.deemixQuality') }}
+                    <select
+                      v-model="s.deemix.bitrate"
+                      class="rounded border border-line bg-surface p-2"
+                    >
+                      <option value="1">MP3 128 kbps</option>
+                      <option value="3">MP3 320 kbps</option>
+                      <option value="9">FLAC</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="px-5 py-4">
+                  <ConnectionTest
+                    kind="deemix"
+                    :config="s.deemix"
+                    :url="s.deemix.base_url"
+                  />
+                </div>
               </template>
             </SettingGroup>
 
@@ -625,6 +692,15 @@
                 />
               </SettingRow>
               <SettingRow
+                :label="t('settings.allowPlaylistSharing')"
+                :description="t('settings.allowPlaylistSharingHint')"
+              >
+                <UiSwitch
+                  v-model="s.allow_playlist_sharing"
+                  :aria-label="t('settings.allowPlaylistSharing')"
+                />
+              </SettingRow>
+              <SettingRow
                 :label="t('settings.reconcile')"
                 :description="t('settings.reconcileHint')"
                 stacked
@@ -646,12 +722,36 @@
                 </p>
               </SettingRow>
             </SettingGroup>
+            <SettingGroup
+              :title="t('settings.primaryLibrary')"
+              :description="t('settings.primaryLibraryHint')"
+            >
+              <label class="grid gap-2 px-5 py-4 text-sm">
+                {{ t('settings.primaryLibrary') }}
+                <select
+                  v-model="s.external_library.primary_folder"
+                  class="rounded-lg border border-line-3 bg-surface-2 p-2"
+                >
+                  <option value="">Downtify</option>
+                  <option
+                    v-for="folder in s.external_library.folders"
+                    :key="folder"
+                    :value="folder"
+                  >
+                    {{ folder }}
+                  </option>
+                </select>
+              </label>
+            </SettingGroup>
             <ExternalLibrarySettings />
           </template>
 
           <!-- Apps: pairing, sign-in, the server's name -->
           <template v-else-if="section === 'users'">
-            <UsersSettings />
+            <div class="flex min-w-0 flex-col gap-8">
+              <UsersSettings />
+              <HiddenLibrarySettings />
+            </div>
           </template>
 
           <template v-else-if="section === 'activity'">
@@ -794,6 +894,7 @@ import AccountSettings from '/src/components/settings/AccountSettings.vue'
 import ActivitySettings from '/src/components/settings/ActivitySettings.vue'
 import AppsSettings from '/src/components/settings/AppsSettings.vue'
 import ServerPortSetting from '/src/components/settings/ServerPortSetting.vue'
+import HiddenLibrarySettings from '/src/components/settings/HiddenLibrarySettings.vue'
 import UsersSettings from '/src/components/settings/UsersSettings.vue'
 import SettingGroup from '/src/components/settings/SettingGroup.vue'
 import SettingRow from '/src/components/settings/SettingRow.vue'

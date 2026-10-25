@@ -1,4 +1,4 @@
-// Sidebar tree — same sections and order the zensical site had.
+// Sidebar tree â€” same sections and order the zensical site had.
 // `page` is the Markdown file under docs/; titles and icons are filled in
 // from each page (see config.mjs).
 export const NAV = [
@@ -27,6 +27,11 @@ export const NAV = [
       { title: 'Finder', page: 'features/finder.md' },
       { title: 'Download Settings', page: 'features/download-settings.md' },
       { title: 'Playlist Monitor', page: 'features/playlist-monitor.md' },
+      { title: 'Playlist display names', page: 'features/playlist-names.md' },
+      {
+        title: 'Hidden playlist songs',
+        page: 'features/hidden-playlist-songs.md',
+      },
       { title: 'Top Songs', page: 'features/top-songs.md' },
       { title: 'Library Import (CSV)', page: 'features/library-import.md' },
       { title: 'Built-in Player', page: 'features/player.md' },
@@ -37,6 +42,7 @@ export const NAV = [
       { title: 'Mobile Apps', page: 'features/mobile-apps.md' },
       { title: 'Server Settings', page: 'features/server.md' },
       { title: 'slskd & Navidrome', page: 'features/slskd-navidrome.md' },
+      { title: 'Deemix', page: 'features/deemix.md' },
       { title: 'Library Catalog', page: 'features/library-catalog.md' },
       {
         title: 'Existing music folders',
@@ -45,13 +51,19 @@ export const NAV = [
       { title: 'Upgrade Library', page: 'features/library-upgrade.md' },
       { title: 'Replace Audio', page: 'features/replace-audio.md' },
       { title: 'M3U Export', page: 'features/m3u-export.md' },
+      {
+        title: 'Import existing playlists',
+        page: 'features/external-playlists.md',
+      },
       { title: 'Playlist Cover Art', page: 'features/playlist-cover-art.md' },
       {
         title: 'Artist Photo, Banner & Bio',
         page: 'features/artist-images.md',
       },
+      { title: 'Support the Artist', page: 'features/support-artists.md' },
       { title: 'File Organization', page: 'features/file-organization.md' },
       { title: 'Lyrics', page: 'features/lyrics.md' },
+      { title: 'Explicit Marker', page: 'features/explicit-marker.md' },
       { title: 'YouTube Cookies', page: 'features/youtube-cookies.md' },
       {
         title: 'Internationalization',

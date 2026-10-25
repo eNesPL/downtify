@@ -4,11 +4,14 @@ The endpoints intentionally mirror the surface that the previous
 ``spotdl``-powered backend exposed so the existing Vue frontend keeps
 working without changes.
 
-Library reads are per-user: a ``user`` browses only tracks, likes,
-playlists, batches and queue jobs of their own (see
-:mod:`downtify.track_owners` and ``docs/features/users.md``); an
-``admin`` sees everything. Playing, streaming, searching and asking
-for downloads stay shared, and files are never stored twice.
+The library is shared: every account browses every downloaded track,
+album and artist - minus what an admin hid from users (see
+:mod:`downtify.library_visibility`, ``GET|POST /api/library/visibility``
+and ``docs/features/users.md``). Likes, playlists, batches and queue
+jobs stay per-user (a ``user`` sees their own; an ``admin`` sees
+everything), and who downloaded a file (:mod:`downtify.track_owners`)
+decides who may delete it. Playing, streaming, searching and asking for
+downloads are shared, and files are never stored twice.
 
 * ``GET  /api/version``
 * ``GET  /api/health`` (liveness probe for the Docker ``HEALTHCHECK`` -
@@ -166,6 +169,19 @@ for downloads stay shared, and files are never stored twice.
 * ``POST /api/library/playlists/tracks`` (add or remove tracks on a
   manual playlist)
 * ``POST /api/library/playlists/rename`` (rename a manual playlist)
+* ``PUT  /api/library/playlists/visibility`` (share a playlist you own,
+  view-only: private, with named users, or public),
+  ``POST /api/library/playlists/copy`` (save a copy of a playlist you can
+  open) and ``POST /api/library/playlists/detach`` (turn an imported
+  playlist into an editable one)
+* ``GET  /api/library/playlists/details`` (what the playlist page
+  filters by: ``{name, providers: {file: provider}, navidrome: {enabled,
+  unmatched}}`` - see ``downtify/file_providers.py``)
+* ``GET|POST /api/library/playlists/hidden`` (songs hidden from an
+  imported playlist - ``POST`` body ``{name, hide, show}``: library
+  paths to hide, hidden song keys to show again; a hidden song stays
+  out of the playlist when its watch or link brings it back - see
+  ``downtify/playlist_hidden.py``)
 * ``POST /api/library/reconcile`` (fix stored library paths after files
   moved on disk, then refresh M3U/Navidrome playlists)
 * ``POST /api/library/external/sync`` (start a background scan of
@@ -246,6 +262,11 @@ for downloads stay shared, and files are never stored twice.
  * ``GET  /api/preview`` (a song's 30 s preview clip from Deezer, for a
    song with no ``preview_url`` of its own - ``?artist=&title=&duration=``,
    response ``{preview_url}``, ``""`` when Deezer has no matching song)
+ * ``GET  /api/buy`` (where to buy a song, album or artist's music to
+   support them - ``?artist=&title=&album=&country=``, response ``{kind,
+   query, links}``: the iTunes Store item with its price when found,
+   Bandcamp and Qobuz searches, the artist's website from their saved
+   profile - see ``downtify.buy_links``)
  * ``GET  /api/similar/tracks`` (tracks similar to ``?artist=&track=``
    via YouTube Music's own radio mix for the track - downloadable song
    rows plus ``match`` - see
@@ -280,10 +301,13 @@ for downloads stay shared, and files are never stored twice.
 * ``/api/v1/...``: the apps' API, by track id - ``GET /api/v1/library``
   (``?since=`` change feed), ``GET /api/v1/tracks/{id}`` (and
   ``/stream``, ``/cover``, ``/lyrics``), ``GET /api/v1/playlists``,
-  ``GET|PUT /api/v1/likes`` and ``POST /api/v1/sign`` - see
+  ``POST|DELETE /api/v1/playlists/follow``, ``POST /api/v1/playlists/seen``,
+  ``GET|POST /api/v1/playlists/hidden``,
+  ``GET /api/v1/usernames``, ``GET|PUT /api/v1/likes`` and
+  ``POST /api/v1/sign`` - see
   ``downtify/mobile_routes.py`` and ``docs/mobile-client-contract.md``
-* ``WS   /api/ws`` (also ``library_changed``, ``device_paired``
-  messages; a device token, session cookie or ``?ticket=`` is needed)
+* ``WS   /api/ws`` (also ``library_changed``, ``playlists_changed``,
+  ``device_paired`` messages; a device token, session cookie or ``?ticket=`` is needed)
 * ``GET  /api/check_update``
 """
 
@@ -300,6 +324,7 @@ import re
 import shutil
 import threading
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Collection, Optional
@@ -322,11 +347,13 @@ from . import (
     artist_photo_proxy,
     artist_profile,
     audio_replace,
+    catalog_worker,
     cover_sources,
     deezer,
     integration_check,
     library_import,
     library_upgrade,
+    library_visibility,
     lyrics,
     m3u,
     providers,
@@ -344,9 +371,23 @@ from .auth import (
     client_ip,
     trusted_proxies_from_env,
 )
+from .buy_links import buy_links
 from .cookies import MAX_COOKIES_BYTES, CookiesStore, InvalidCookiesFile
 from .cover_cache import CoverArtCache
 from .cover_thumbs import CoverThumbs
+from .deemix_provider import (
+    DEFAULT_SETTINGS as DEEMIX_DEFAULTS,
+)
+from .deemix_provider import (
+    DeemixError,
+    check_deemix,
+)
+from .deemix_provider import (
+    normalize_settings as normalize_deemix_settings,
+)
+from .deemix_provider import (
+    validate_settings as validate_deemix_settings,
+)
 from .discover import (
     DiscoverStore,
     collections,
@@ -368,12 +409,17 @@ from .external_library import (
     effective_external_library,
     extra_dirs_from_settings,
 )
+from .external_playlists import (
+    ExternalPlaylistImports,
+    discover_external_playlists,
+)
 from .external_sync import (
     ExternalSyncJob,
     folders_removed,
     run_external_sync,
     unmap_extra_folder,
 )
+from .file_providers import FileProviders, providers_for
 from .fs_suggest import suggest_directories
 from .library_catalog import (
     LibraryContext,
@@ -400,6 +446,7 @@ from .library_paths import locate_library_file, slskd_dir_from_downloader
 from .library_paths_cache import (
     add_invalidation_listener,
     invalidate_library_paths_cache,
+    peek_cached_path_pairs,
 )
 from .library_reconcile import (
     playlist_refresh_enabled,
@@ -407,6 +454,7 @@ from .library_reconcile import (
     refresh_playlists_after_moves,
 )
 from .library_sync import LibrarySync
+from .library_visibility import HiddenRules, LibraryVisibility
 from .likes import (
     LIKED_PLAYLIST_NAME,
     LikedTracks,
@@ -418,8 +466,11 @@ from .likes import (
 from .lyrics_cache import LyricsLookupCache
 from .manual_playlists import (
     ManualPlaylistError,
+    copy_playlist,
     create_manual_playlist,
+    detach_imported_playlist,
     edit_manual_playlist,
+    existing_playlist_names,
     rename_manual_playlist,
 )
 from .monitor import (
@@ -437,15 +488,40 @@ from .monitor import (
     normalize_release_types,
     parse_playlist_url,
 )
-from .navidrome import _effective_navidrome_settings, cache_navidrome_song_id
+from .navidrome import (
+    _effective_navidrome_settings,
+    cache_navidrome_song_id,
+    enrich_song_from_library_file,
+    sync_playlist_to_navidrome,
+)
 from .navidrome_index import NavidromeIndex
 from .playlist_batches import (
+    LibrarySnapshot,
     PlaylistBatchStore,
     active_queue_count_for_playlist,
     split_tracks_by_library,
 )
 from .playlist_catalog import ManualPlaylistOwners, PlaylistCatalog
+from .playlist_hidden import (
+    HiddenSongs,
+    HiddenSongsError,
+    PlaylistHiddenSongs,
+    catalog_names_for,
+    hidden_key,
+    hide_playlist_songs,
+    show_playlist_songs,
+    source_track_ids,
+)
 from .playlist_listing import list_library_playlists
+from .playlist_mosaic import keep_explicit_cover
+from .playlist_shares import (
+    PRIVATE,
+    SHARED,
+    VISIBILITIES,
+    PlaylistShares,
+    ShareView,
+    share_key,
+)
 from .playlist_spotify_cache import (
     PlaylistSpotifyCache,
     fetch_playlist_tracks,
@@ -490,6 +566,7 @@ MAX_COVER_RESOLUTION = 1200
 
 DEFAULT_SETTINGS: dict[str, Any] = {
     'audio_providers': ['youtube-music'],
+    'deemix': dict(DEEMIX_DEFAULTS),
     'lyrics_providers': list(lyrics.PROVIDER_ORDER),
     'download_lyrics': True,
     'lyrics_lrc_beside': True,
@@ -546,6 +623,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     },
     # Navidrome (Subsonic API) playlist sync after playlist downloads.
     'sync_navidrome': True,
+    # Whether users may share their playlists with other users (each user
+    # also chooses whether to see public ones: ``show_public_playlists``).
+    'allow_playlist_sharing': True,
     'navidrome': {
         'enabled': False,
         'url': '',
@@ -584,6 +664,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
 # defaults key by key, so a settings.json from an older version still gets
 # every newer option.
 _NESTED_SETTINGS = (
+    'deemix',
     'slskd',
     'navidrome',
     'library_upgrade',
@@ -772,6 +853,10 @@ def _effective_slskd_settings(settings: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _effective_deemix_settings(settings: dict[str, Any]) -> dict[str, Any]:
+    return normalize_deemix_settings(settings.get('deemix'))
+
+
 def _effective_audio_providers(settings: dict[str, Any]) -> list[str]:
     """Enabled audio providers in the configured order.
 
@@ -785,6 +870,11 @@ def _effective_audio_providers(settings: dict[str, Any]) -> list[str]:
     for raw in settings.get('audio_providers') or []:
         name = str(raw or '').strip()
         if name == 'slskd' and not slskd_enabled:
+            continue
+        if (
+            name == 'deemix'
+            and not _effective_deemix_settings(settings)['enabled']
+        ):
             continue
         if name in AUDIO_PROVIDERS and name not in out:
             out.append(name)
@@ -1017,10 +1107,17 @@ class AppState:
     playlist_spotify_cache: Optional[PlaylistSpotifyCache] = None
     lyrics_cache: Optional[LyricsLookupCache] = None
     upgrade_runner: Optional[library_upgrade.LibraryUpgradeRunner] = None
+    audio_replacements: Any = None
     external_sync: Optional[ExternalSyncJob] = None
     likes: Optional[LikedTracks] = None
     track_owners: Optional[TrackOwners] = None
+    library_visibility: Optional[LibraryVisibility] = None
     manual_playlist_owners: Optional[ManualPlaylistOwners] = None
+    playlist_shares: Optional[PlaylistShares] = None
+    playlist_hidden: Optional[PlaylistHiddenSongs] = None
+    # Which audio provider fetched each file (downtify/file_providers.py).
+    file_providers: Optional[FileProviders] = None
+    external_playlist_imports: Optional[ExternalPlaylistImports] = None
     traffic: Optional[TrafficCounters] = None
     podcasts: Optional[PodcastStore] = None
     discover: Optional[DiscoverStore] = None
@@ -1089,20 +1186,48 @@ def request_is_admin(request: Optional[Request]) -> bool:
     return bool(principal is not None and principal.is_admin)
 
 
+def hidden_rules() -> HiddenRules:
+    """What admins hid from users (nothing, until they hide something)."""
+
+    if state.library_visibility is None:
+        return HiddenRules()
+    try:
+        return state.library_visibility.rules()
+    except Exception:
+        logger.opt(exception=True).warning('Could not read hidden items')
+        return HiddenRules()
+
+
+def admin_hidden_rules(request: Optional[Request]) -> Optional[HiddenRules]:
+    """The rules to mark rows with for an admin's view, else ``None``
+    (users get the rows themselves cut instead)."""
+
+    if not request_is_admin(request):
+        return None
+    rules = hidden_rules()
+    return rules if rules else None
+
+
 def allowed_entry_keys(request: Optional[Request]) -> Optional[set[str]]:
     """Content keys *request* may browse (``None``: everything).
 
-    Admins see the whole library, including files nobody owns (monitor
-    sweeps, reconciled drops, pre-feature downloads). Anyone else sees
-    only files they asked to download.
+    The library is shared: an admin sees all of it, and so does everyone
+    else - except what an admin hid from users, which is cut here (one
+    pass over the listing, and only while something is hidden).
     """
 
-    if request_is_admin(request) or state.track_owners is None:
+    if request_is_admin(request):
         return None
-    user_id = request_user_id(request)
-    if not user_id:
+    if not request_user_id(request):
         return set()
-    return state.track_owners.owned_keys(user_id)
+    rules = hidden_rules()
+    if not rules:
+        return None
+    return {
+        entry_content_key(entry)
+        for entry in listing_for_request(library_context())
+        if not rules.hides(entry)
+    }
 
 
 def _playlist_owner_maps() -> tuple[dict[str, int], dict[str, int]]:
@@ -1125,47 +1250,166 @@ def _playlist_owner_maps() -> tuple[dict[str, int], dict[str, int]]:
     return catalog_names, manual
 
 
+def sharing_enabled() -> bool:
+    """Whether the admin lets users share playlists (Settings)."""
+
+    return bool(state.settings.get('allow_playlist_sharing', True))
+
+
+def _share_view(user_id: int) -> ShareView:
+    """What *user_id* is shown of other people's playlists (nothing while
+    sharing is off)."""
+
+    shares = state.playlist_shares
+    if shares is None or not user_id or not sharing_enabled():
+        return ShareView()
+    try:
+        return shares.view_for(user_id)
+    except Exception:
+        logger.opt(exception=True).debug('Could not read playlist shares')
+        return ShareView()
+
+
+def _usernames() -> dict[int, str]:
+    """``{user id: username}`` for labelling whose playlist it is."""
+
+    if state.auth is None:
+        return {}
+    try:
+        return {
+            int(user['id']): str(user['username'])
+            for user in state.auth.users.list()
+        }
+    except Exception:
+        logger.opt(exception=True).debug('Could not list usernames')
+        return {}
+
+
 def _playlist_visible(
     name: str, *, liked: bool, manual: bool, user_id: int
 ) -> bool:
-    """Whether *user_id* may open a playlist (admins bypass this)."""
+    """Whether *user_id* may open a playlist (admins bypass this): their
+    own, one shared with them, or a public one."""
 
     if liked or not user_id:
         return False
     catalog_names, manual_owners = _playlist_owner_maps()
-    key = str(name or '').strip().casefold()
-    if manual:
-        return manual_owners.get(key) == user_id
-    return catalog_names.get(key) == user_id
+    key = share_key(name)
+    owner = (manual_owners if manual else catalog_names).get(key, 0)
+    if owner == user_id:
+        return True
+    if not owner:
+        return False
+    view = _share_view(user_id)
+    return key in view.public or key in view.to_me
+
+
+@dataclass
+class _PlaylistLens:
+    """Who is looking, and what every playlist's owner and sharing are -
+    read once per listing."""
+
+    admin: bool
+    user_id: int
+    owners: tuple[dict[str, int], dict[str, int]]
+    visibility: dict[str, str]
+    shared_users: dict[str, list[int]]
+    view: ShareView
+    show_public: bool
+    names: dict[int, str]
+
+    def row(self, playlist: dict[str, Any]) -> Optional[dict[str, Any]]:
+        """*playlist* as the viewer sees it, or ``None`` when hidden."""
+
+        key = share_key(str(playlist.get('name') or ''))
+        owner_id = self.owners[1 if playlist.get('manual') else 0].get(key, 0)
+        mine = self.admin or bool(self.user_id and owner_id == self.user_id)
+        followed = key in self.view.followed
+        invited = key in self.view.to_me
+        if not mine and not (
+            owner_id
+            and (
+                invited
+                or (key in self.view.public and (followed or self.show_public))
+            )
+        ):
+            return None
+        row = {
+            **playlist,
+            'owner_id': owner_id,
+            'owner': self.names.get(owner_id, ''),
+            'visibility': self.visibility.get(key, PRIVATE),
+            'mine': mine,
+            'followed': followed,
+            'shared_with_me': invited,
+            'new': invited and not self.view.to_me[key],
+        }
+        if mine:
+            row['shared_with'] = [
+                self.names[uid]
+                for uid in self.shared_users.get(key, [])
+                if uid in self.names
+            ]
+        return row
+
+
+def _playlist_lens(request: Optional[Request]) -> _PlaylistLens:
+    admin = request_is_admin(request)
+    user_id = request_user_id(request)
+    visibility: dict[str, str] = {}
+    shared_users: dict[str, list[int]] = {}
+    shares = state.playlist_shares
+    if shares is not None and sharing_enabled():
+        try:
+            visibility = shares.visibility_map()
+            shared_users = shares.shared_users()
+        except Exception:
+            logger.opt(exception=True).debug('Could not read playlist shares')
+    return _PlaylistLens(
+        admin=admin,
+        user_id=user_id,
+        owners=_playlist_owner_maps(),
+        visibility=visibility,
+        shared_users=shared_users,
+        view=ShareView() if admin else _share_view(user_id),
+        show_public=admin
+        or bool(user_preferences(request).get('show_public_playlists', True)),
+        names=_usernames(),
+    )
 
 
 def _filter_playlists_for(
     playlists: list[dict[str, Any]], request: Optional[Request]
 ) -> list[dict[str, Any]]:
-    """Playlists *request* may open, with a personal liked entry.
+    """Playlists *request* may open, each labelled with its owner.
 
-    Admins see everything as before. Anyone else sees playlists they
-    own (downloaded or Library-created); the shared liked-songs file
-    is swapped for their own hearts (which live in the database only).
+    Admins see everything. Anyone else sees playlists they own
+    (downloaded or Library-created), those shared with them by name,
+    the public ones they follow and - unless they switched
+    *Show public playlists* off - the rest of the public ones. The
+    shared liked-songs file is swapped for their own hearts (which live
+    in the database only).
+
+    Rows are copies carrying ``owner_id``, ``owner``, ``visibility``,
+    ``mine`` (theirs to change: their own, or anything for an admin),
+    ``followed``, ``shared_with_me`` and ``new`` (shared with them, not
+    opened yet); the owner's also list ``shared_with`` (usernames) and,
+    on an imported playlist they hid songs from, ``hidden_count``.
     """
 
-    if request_is_admin(request):
-        return playlists
-    user_id = request_user_id(request)
-    kept = [
-        playlist
-        for playlist in playlists
-        if not playlist.get('liked')
-        and _playlist_visible(
-            str(playlist.get('name') or ''),
-            liked=False,
-            manual=bool(playlist.get('manual')),
-            user_id=user_id,
-        )
-    ]
-    if user_id and state.likes is not None:
+    lens = _playlist_lens(request)
+    kept: list[dict[str, Any]] = []
+    for playlist in playlists:
+        if playlist.get('liked'):
+            if lens.admin:
+                kept.append(playlist)
+            continue
+        row = lens.row(playlist)
+        if row is not None:
+            kept.append(row)
+    if lens.user_id and not lens.admin and state.likes is not None:
         try:
-            liked_files = state.likes.paths(user_id)
+            liked_files = state.likes.paths(lens.user_id)
         except Exception:
             logger.opt(exception=True).debug(
                 'Could not read likes for playlist listing'
@@ -1180,31 +1424,104 @@ def _filter_playlists_for(
                 'cover': '',
                 'liked': True,
                 'manual': False,
+                'mine': True,
+                'visibility': PRIVATE,
             })
+    labels = (
+        state.playlist_shares.display_names()
+        if state.playlist_shares is not None
+        else {}
+    )
+    favorites = (
+        state.playlist_shares.favorites(lens.user_id)
+        if state.playlist_shares is not None and lens.user_id
+        else frozenset()
+    )
+    kept = [
+        {
+            **row,
+            'display_name': labels.get(
+                playlist_display_identity(row), row['name']
+            ),
+            'favorite': playlist_favorite_identity(row) in favorites,
+        }
+        for row in kept
+    ]
+    hidden_counts = _hidden_song_counts()
+    for row in kept:
+        # The owner's imported playlists say how many songs they hide.
+        count = hidden_counts.get(hidden_key(row['name']), 0)
+        if count and row.get('mine') and not row.get('manual'):
+            row['hidden_count'] = count
     kept.sort(
         key=lambda item: (
+            not item.get('favorite'),
             not item.get('liked'),
-            str(item.get('name') or '').casefold(),
+            str(item.get('display_name') or item.get('name') or '').casefold(),
         )
     )
     return kept
 
 
+def _hidden_song_counts() -> dict[str, int]:
+    """``{playlist key: hidden songs}`` (empty when nothing is hidden)."""
+
+    if state.playlist_hidden is None:
+        return {}
+    try:
+        return state.playlist_hidden.counts()
+    except Exception:
+        logger.opt(exception=True).debug('Could not count hidden songs')
+        return {}
+
+
+def playlist_display_identity(entry: dict[str, Any]) -> str:
+    """Keep a source-backed playlist's label through source-name updates."""
+    name = str(entry['name'])
+    catalog = state.playlist_catalog
+    source = (
+        catalog.spotify_id_for_playlist(name) if catalog is not None else None
+    )
+    return f'source:{source}' if source else f'name:{share_key(name)}'
+
+
+def playlist_favorite_identity(entry: dict[str, Any]) -> str:
+    name = str(entry['name'])
+    catalog = state.playlist_catalog
+    source = catalog.spotify_id_for_playlist(name) if catalog else None
+    if source:
+        return '@source:' + hashlib.sha256(source.encode()).hexdigest()
+    return share_key(name)
+
+
 def _filter_entries_for(
     entries: list[dict[str, Any]], request: Optional[Request]
 ) -> list[dict[str, Any]]:
-    """Library rows *request* may browse, with foreign playlists cut.
+    """Library rows *request* may browse.
 
-    A track can sit in playlists nobody else may open (someone else's
-    download shares the file): those names are scrubbed from its row,
-    so the row never reveals them. Rows are copied, never mutated - the
-    snapshot they come from is shared.
+    An admin gets every row; those hidden from users carry ``hidden_by``
+    (``track``, ``album`` or ``artist``). Anyone else gets every row an
+    admin hasn't hidden, with foreign playlists cut: a track can sit in
+    playlists nobody else may open (someone else's download shares the
+    file), and those names are scrubbed from its row so it never reveals
+    them. Rows are copied, never mutated - the snapshot they come from
+    is shared.
     """
 
-    allowed = allowed_entry_keys(request)
-    if allowed is None:
-        return entries
+    if request_is_admin(request):
+        rules = admin_hidden_rules(request)
+        if rules is None:
+            return entries
+        marked = []
+        for entry in entries:
+            reason = rules.reason(entry)
+            marked.append({**entry, 'hidden_by': reason} if reason else entry)
+        return marked
+
     user_id = request_user_id(request)
+    if not user_id:
+        return []
+    rules = hidden_rules()
     catalog_names, manual_owners = _playlist_owner_maps()
     owned = {name for name, uid in catalog_names.items() if uid == user_id} | {
         key for key, uid in manual_owners.items() if uid == user_id
@@ -1221,11 +1538,21 @@ def _filter_entries_for(
 
     filtered = []
     for entry in entries:
-        if entry_content_key(entry) not in allowed:
+        if rules and rules.hides(entry):
             continue
         names = entry.get('playlists')
         filtered.append(_scrubbed(entry, names) if names else entry)
     return filtered
+
+
+def visible_entries(
+    entries: list[dict[str, Any]], request: Optional[Request]
+) -> list[dict[str, Any]]:
+    """*entries* as *request* may see them (hidden songs cut for a user,
+    marked for an admin) - for a listing built from a subset, such as one
+    playlist's tracks."""
+
+    return _filter_entries_for(entries, request)
 
 
 def entries_for_request(request: Optional[Request]) -> list[dict[str, Any]]:
@@ -1255,11 +1582,16 @@ def filter_paths_for_request(
 
 
 def playlists_for_request(request: Optional[Request]) -> list[dict[str, Any]]:
-    """Playlist listing entries *request* may open."""
+    """Playlist listing entries *request* may open.
+
+    Served from memory while recently checked (see
+    ``library_paths_cache.PLAYLIST_RECHECK_SECONDS``): walking the
+    downloads folder for M3U files on every page took ~300 ms on a NAS.
+    """
 
     ctx = library_context()
     found = list_library_playlists(
-        ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs
+        ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs, stale_ok=True
     )
     return _filter_playlists_for(found, request)
 
@@ -1311,11 +1643,22 @@ def playlist_entry_for_request(
     }
 
 
-def require_playlist_visible(name: str, request: Optional[Request]) -> None:
-    """404 unless *request* may open the playlist (as if unknown)."""
+def require_playlist_visible(
+    name: str, request: Optional[Request], *, manage: bool = False
+) -> dict[str, Any]:
+    """The playlist's entry; 404 unless *request* may open it (as if
+    unknown). With *manage*, 403 unless it is also theirs to change - a
+    playlist shared with them is view-only."""
 
-    if playlist_entry_for_request(name, request) is None:
+    entry = playlist_entry_for_request(name, request)
+    if entry is None:
         raise HTTPException(status_code=404, detail='Playlist not found')
+    if manage and not entry.get('mine', True):
+        raise HTTPException(
+            status_code=403,
+            detail='Only the owner can change this playlist',
+        )
+    return entry
 
 
 def claim_manual_playlist(name: str, request: Optional[Request]) -> None:
@@ -1326,6 +1669,10 @@ def claim_manual_playlist(name: str, request: Optional[Request]) -> None:
         return
     try:
         state.manual_playlist_owners.set_owner(name, user_id)
+        if state.playlist_shares is not None:
+            # A new playlist never inherits what an older one by that name
+            # was shared with.
+            state.playlist_shares.forget(name)
     except Exception:
         logger.opt(exception=True).debug(
             'Could not record owner for playlist {!r}', name
@@ -1474,6 +1821,14 @@ async def shutdown_resources() -> None:
         except Exception:
             logger.exception('Library upgrade: could not pause on shutdown')
 
+    await asyncio.to_thread(catalog_worker.stop_catalog_worker)
+
+    if state.traffic is not None:
+        try:
+            await asyncio.to_thread(state.traffic.flush)
+        except Exception:
+            logger.exception('Traffic counters: could not save on shutdown')
+
     try:
         loop = asyncio.get_running_loop()
         await asyncio.wait_for(
@@ -1516,6 +1871,7 @@ def library_stores() -> LibraryStores:
         cover_cache=state.cover_cache,
         playlist_spotify_cache=state.playlist_spotify_cache,
         track_owners=state.track_owners,
+        playlist_hidden=state.playlist_hidden,
     )
 
 
@@ -1532,6 +1888,10 @@ def stored_content_key(stored_path: str) -> str:
         return content_key_for(full) or ''
     except Exception:
         return ''
+
+
+#: What a delete answers for a file that isn't the caller's to delete.
+NOT_YOURS_ERROR = 'Only an admin or whoever downloaded it can delete this song'
 
 
 def ownership_action(
@@ -1626,29 +1986,69 @@ def record_stream_fetch_traffic(video_path: Path, user_id: int) -> None:
 def rekey_file_owners(
     old_key: str, new_key: str, stored_path: str = ''
 ) -> None:
-    """Point ownership rows at a rewritten file (best effort)."""
+    """Point ownership rows (and a hidden song's rule) at a rewritten
+    file (best effort)."""
 
-    if state.track_owners is None:
-        return
-    try:
-        state.track_owners.rekey(old_key, new_key, stored_path)
-    except Exception:
-        logger.opt(exception=True).debug(
-            'Could not rekey owners for {}', stored_path
-        )
+    if state.track_owners is not None:
+        try:
+            state.track_owners.rekey(old_key, new_key, stored_path)
+        except Exception:
+            logger.opt(exception=True).debug(
+                'Could not rekey owners for {}', stored_path
+            )
+    # A hidden song stays hidden after its file is rewritten.
+    if state.library_visibility is not None:
+        try:
+            state.library_visibility.rekey_track(old_key, new_key, stored_path)
+        except Exception:
+            logger.opt(exception=True).debug(
+                'Could not rekey hidden item for {}', stored_path
+            )
+    # So does a song hidden from a playlist.
+    if state.playlist_hidden is not None:
+        try:
+            state.playlist_hidden.rekey(old_key, new_key, stored_path)
+        except Exception:
+            logger.opt(exception=True).debug(
+                'Could not rekey hidden playlist song {}', stored_path
+            )
+    # And what fetched it.
+    if state.file_providers is not None:
+        try:
+            state.file_providers.rekey(old_key, new_key, stored_path)
+        except Exception:
+            logger.opt(exception=True).debug(
+                'Could not rekey the provider of {}', stored_path
+            )
 
 
 def drop_file_owners(content_key: str) -> None:
-    """Forget every owner (their file was just deleted from disk)."""
+    """Forget every owner and any hidden-song rule (the file was just
+    deleted from disk)."""
 
-    if state.track_owners is None or not content_key:
+    if not content_key:
         return
-    try:
-        state.track_owners.drop_file(content_key)
-    except Exception:
-        logger.opt(exception=True).warning(
-            'Could not drop owners for a deleted file'
-        )
+    if state.track_owners is not None:
+        try:
+            state.track_owners.drop_file(content_key)
+        except Exception:
+            logger.opt(exception=True).warning(
+                'Could not drop owners for a deleted file'
+            )
+    if state.library_visibility is not None:
+        try:
+            state.library_visibility.drop_track(content_key)
+        except Exception:
+            logger.opt(exception=True).debug(
+                'Could not drop a hidden item for a deleted file'
+            )
+    if state.file_providers is not None:
+        try:
+            state.file_providers.drop(content_key)
+        except Exception:
+            logger.opt(exception=True).debug(
+                'Could not drop the provider of a deleted file'
+            )
 
 
 #: Who pre-feature files belong to on the first start with ownership.
@@ -1961,6 +2361,8 @@ def _upsert_track_in_playlists(
             spotify_id=sid,
             user_id=user_id if pl_name == primary else None,
         )
+        if hidden_from_playlist(pl_name, song, filename):
+            continue
         order = primary_order if pl_name == primary else 0
         catalog.upsert_track(pl_name, song, filename, full, track_order=order)
 
@@ -2137,6 +2539,17 @@ def bind_lrc_resolver() -> None:
 
     def _resolve(audio: Path) -> Path:
         ctx = library_context()
+        deemix = _effective_deemix_settings(state.settings)
+        if deemix['enabled']:
+            try:
+                audio.resolve().relative_to(
+                    Path(deemix['source_dir']).resolve()
+                )
+                beside = audio.with_suffix('.lrc')
+                if beside.is_file():
+                    return beside
+            except (OSError, ValueError):
+                pass
         return lyrics.lrc_sidecar_path(
             audio,
             settings=state.settings,
@@ -2715,6 +3128,32 @@ def _ui_language() -> str:
     return str(state.settings.get('ui_language') or '') or 'en'
 
 
+def after_download(song: dict[str, Any], filename: str) -> None:
+    """``Downloader.on_downloaded`` (set in ``main.py``): remember which
+    provider fetched the new file, then seed its artist's profile. Runs on
+    the download's own thread; never raises."""
+
+    record_download_provider(song, filename)
+    enrich_artist_after_download(song, filename)
+
+
+def record_download_provider(song: dict[str, Any], filename: str) -> None:
+    """Store ``song['download_provider']`` for *filename* (see
+    :mod:`downtify.file_providers`) - best effort."""
+
+    provider = str(song.get('download_provider') or '').strip()
+    if not provider or state.file_providers is None:
+        return
+    try:
+        state.file_providers.record(
+            stored_content_key(filename), filename, provider
+        )
+    except Exception:
+        logger.opt(exception=True).debug(
+            'Could not record the provider of {}', filename
+        )
+
+
 def enrich_artist_after_download(song: dict[str, Any], filename: str) -> None:
     """``Downloader.on_downloaded``: a track just finished, so its artist's
     profile (bio, genre, origin, social links, platform ids) is seeded in the
@@ -2995,8 +3434,10 @@ def _deezer_details(kind: str, did: str) -> dict[str, Any]:
     if kind == 'album':
         return _collection_details('album', deezer.album_from_id(did))
     if kind == 'playlist':
-        name, tracks = deezer.playlist_info_and_tracks(did)
-        return _collection_details('playlist', tracks, name)
+        name, cover, tracks = deezer.playlist_page_from_id(did)
+        details = _collection_details('playlist', tracks, name)
+        details['cover_url'] = cover
+        return details
     if kind == 'artist':
         # Deezer has a real discography endpoint (unlike Spotify's embed),
         # so - like YouTube Music - the releases come straight from it,
@@ -3169,6 +3610,10 @@ def _merge_client_track_hints(
         else:
             if tv > 0:
                 base['album_track_total'] = tv
+    # The search row says whether *that* upload has explicit lyrics, which
+    # the URL alone (a bare video id) can't. It only ever adds the mark.
+    if hints.get('explicit') is True:
+        base['explicit'] = True
     rd = hints.get('release_date')
     if isinstance(rd, str) and rd.strip():
         base['release_date'] = rd.strip()
@@ -3743,20 +4188,51 @@ async def download_endpoint(
     return filename
 
 
+def hidden_songs_for(name: str) -> HiddenSongs:
+    """The songs the owner hid from playlist *name* (see
+    :mod:`downtify.playlist_hidden`) - empty when none, or on error."""
+
+    store = state.playlist_hidden
+    if store is None or not name:
+        return HiddenSongs()
+    try:
+        return store.songs(name)
+    except Exception:
+        logger.opt(exception=True).warning(
+            'Could not read the hidden songs of {!r}', name
+        )
+        return HiddenSongs()
+
+
+def hidden_from_playlist(
+    playlist_name: str, song: dict[str, Any], filename: str
+) -> bool:
+    """Whether the owner hid *song* (downloaded as *filename*) from
+    playlist *playlist_name* - then it is never linked to it again."""
+
+    hidden = hidden_songs_for(playlist_name)
+    return hidden.hides_song(song) or hidden.hides_file(filename)
+
+
 def _m3u_entries_for(
-    songs: list[dict[str, Any]], resolved: dict[int, Optional[str]]
+    songs: list[dict[str, Any]],
+    resolved: dict[int, Optional[str]],
+    hidden: HiddenSongs = HiddenSongs(),
 ) -> list[dict[str, Any]]:
     """Build M3U entries for the songs downloaded so far.
 
     Iterates ``songs`` in playlist order (not completion order, which
     varies with concurrency) and keeps only those with a filename in
     ``resolved``, so a partially-finished batch still produces a
-    correctly-ordered file.
+    correctly-ordered file. Songs *hidden* from the playlist stay out
+    of it even when downloaded again from its link.
     """
     entries: list[dict[str, Any]] = []
     for index, song in enumerate(songs):
         filename = resolved.get(index)
         if not filename:
+            continue
+        if hidden.hides_song(song) or hidden.hides_file(filename):
             continue
         entries.append({
             'filename': filename,
@@ -3773,7 +4249,9 @@ async def _write_batch_m3u(
     playlist_name: str,
     playlist_subdir: str,
 ) -> Optional[Path]:
-    entries = _m3u_entries_for(songs, resolved)
+    entries = _m3u_entries_for(
+        songs, resolved, hidden_songs_for(playlist_name)
+    )
     if not entries:
         return None
     # When organize-by-artist/album is on, songs land in those folders
@@ -3834,10 +4312,9 @@ def _download_playlist_cover_for_batch(
     playlist_id: str,
     m3u_path: Path,
     settings: dict[str, Any],
-) -> None:
+) -> Optional[Path]:
     if source != _SOURCE_DEEZER:
-        download_playlist_cover(source, playlist_id, m3u_path, settings)
-        return
+        return download_playlist_cover(source, playlist_id, m3u_path, settings)
     if not settings.get('download_cover_art_playlists'):
         return
     try:
@@ -3851,7 +4328,7 @@ def _download_playlist_cover_for_batch(
     if not cover_url:
         return
     try:
-        save_playlist_cover(cover_url, m3u_path)
+        return save_playlist_cover(cover_url, m3u_path)
     except Exception:
         logger.exception('Failed to save cover art for {}', m3u_path)
 
@@ -4109,7 +4586,9 @@ async def _finish_playlist_batch(
                 if filename
                 else None
             )
-            if full is None:
+            if full is None or hidden_from_playlist(
+                playlist_name, song, filename
+            ):
                 continue
             catalog.upsert_track(
                 playlist_name,
@@ -4206,7 +4685,11 @@ def _rebuild_playlist_catalog_from_library(
                 filename = str(catalog_filenames.get(tid) or '').strip()
                 if filename:
                     full = locate_library_file(filename, dl_dir, slskd)
-        if filename and full is not None:
+        if (
+            filename
+            and full is not None
+            and not hidden_from_playlist(pl_name, track, filename)
+        ):
             state.playlist_catalog.upsert_track(
                 pl_name, track, filename, full, track_order=index
             )
@@ -4262,6 +4745,23 @@ def _batch_scope(request: Optional[Request]) -> Optional[int]:
     """Whose batches *request* sees: ``None`` (everyone's) for an admin."""
 
     return None if request_is_admin(request) else request_user_id(request)
+
+
+def _is_spotify_playlist_watch(watch: MonitoredPlaylist) -> bool:
+    """Whether *watch* follows a Spotify playlist.
+
+    A watch's ``spotify_id`` column holds whatever it follows: a YouTube
+    Music playlist id, an artist's channel id or a podcast's id. Only a
+    Spotify playlist's id may be looked up on Spotify (the playlist cache
+    does that in the background); anything else only fills the log with
+    "Spotify entity not found" errors.
+    """
+
+    return (
+        watch.kind == KIND_PLAYLIST
+        and watch.source == SOURCE_SPOTIFY
+        and bool(str(watch.spotify_id or '').strip())
+    )
 
 
 def _known_spotify_playlist_sources(
@@ -4345,7 +4845,7 @@ def _known_spotify_playlist_sources(
             sid = state.playlist_catalog.spotify_id_for_playlist(name) or ''
             if not sid:
                 mon = monitor_by_name.get(name)
-                if mon and mon.spotify_id:
+                if mon and _is_spotify_playlist_watch(mon):
                     sid = str(mon.spotify_id).strip()
                 else:
                     batch = batch_by_name.get(name)
@@ -4362,6 +4862,8 @@ def _known_spotify_playlist_sources(
             }
     if state.monitor_db is not None and user_id is None:
         for pl in state.monitor_db.list_playlists():
+            if not _is_spotify_playlist_watch(pl):
+                continue
             sid = str(pl.spotify_id or '').strip()
             if not sid:
                 continue
@@ -4422,8 +4924,13 @@ def _playlist_batch_summary(
     *,
     batch: Optional[dict[str, Any]] = None,
     expected_hint: int = 0,
+    snapshot: Optional[LibrarySnapshot] = None,
 ) -> dict[str, Any]:
-    """Counts from cached Spotify track list + library scan."""
+    """Counts from cached Spotify track list + library scan.
+
+    *snapshot* (see :func:`_library_snapshot`) matches the tracks in
+    memory instead of on disk.
+    """
 
     active_count = active_queue_count_for_playlist(
         spotify_id, state.download_jobs
@@ -4447,6 +4954,7 @@ def _playlist_batch_summary(
     if cached_tracks is not None:
         if cached_name:
             playlist_name = cached_name
+        cached_tracks = _without_hidden_songs(playlist_name, cached_tracks)
         expected_count = len(cached_tracks)
         downloaded_count = 0
         missing_count = expected_count
@@ -4466,6 +4974,7 @@ def _playlist_batch_summary(
                 track_index=state.track_index,
                 subdir=subdir,
                 catalog_filenames=catalog_filenames,
+                snapshot=snapshot,
             )
             missing_count = len(missing_tracks)
         status = _resolve_playlist_batch_status(
@@ -4528,6 +5037,18 @@ def _playlist_batch_summary(
     }
 
 
+def _without_hidden_songs(
+    playlist_name: str, tracks: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """*tracks* (a playlist's source rows) minus the songs its owner hid
+    from it: they neither count as expected nor as missing."""
+
+    hidden = hidden_songs_for(playlist_name)
+    if not hidden:
+        return tracks
+    return [track for track in tracks if not hidden.hides_song(track)]
+
+
 def _playlist_completeness_report(
     spotify_id: str,
     playlist_name: str,
@@ -4551,6 +5072,7 @@ def _playlist_completeness_report(
             'playlist batch: Spotify fetch failed for {}',
             spotify_id,
         )
+    tracks = _without_hidden_songs(playlist_name, tracks)
 
     subdir = _playlist_subdir_for_name(playlist_name)
     catalog_filenames = _catalog_filenames_for_playlist(
@@ -4650,6 +5172,25 @@ def _report_for_spotify_playlist(
     return report
 
 
+def _library_snapshot() -> Optional[LibrarySnapshot]:
+    """The track index and the listing's paths, read once, so a batch
+    summary checks thousands of tracks without touching the disk.
+    ``None`` until the listing snapshot exists (the summary then checks
+    on disk, as before)."""
+
+    if state.track_index is None:
+        return None
+    pairs = peek_cached_path_pairs(library_context())
+    if pairs is None:
+        return None
+    try:
+        track_files = state.track_index.filenames_by_spotify_id()
+    except Exception:
+        logger.opt(exception=True).debug('Could not read the track index')
+        return None
+    return LibrarySnapshot.build(track_files, [s for s, _r in pairs])
+
+
 def _build_playlist_batch_reports(
     *,
     include_tracks: bool = False,
@@ -4663,14 +5204,14 @@ def _build_playlist_batch_reports(
         if include_tracks
         else _playlist_batch_summary
     )
+    kwargs: dict[str, Any] = (
+        {'user_id': user_id}
+        if builder is _playlist_completeness_report
+        else {'snapshot': _library_snapshot()}
+    )
     reports: list[dict[str, Any]] = []
     for sid, meta in _known_spotify_playlist_sources(user_id).items():
         batch = meta.get('batch')
-        kwargs: dict[str, Any] = (
-            {'user_id': user_id}
-            if builder is _playlist_completeness_report
-            else {}
-        )
         reports.append(
             builder(
                 sid,
@@ -4746,6 +5287,8 @@ def _missing_tracks_for_playlist(
         raise HTTPException(
             status_code=502, detail='Failed to fetch playlist from Spotify'
         ) from exc
+    # A song hidden from the playlist is never "missing" from it.
+    tracks = _without_hidden_songs(playlist_name, tracks)
 
     subdir = _playlist_subdir_for_name(playlist_name)
     catalog_filenames = _catalog_filenames_for_playlist(
@@ -5225,7 +5768,10 @@ async def sync_external_library_endpoint(
     if 'folders' in payload:
         previous = dict(state.settings)
         state.settings['external_library'] = effective_external_library({
-            'external_library': {'folders': payload.get('folders')}
+            'external_library': {
+                **state.settings.get('external_library', {}),
+                'folders': payload.get('folders'),
+            }
         })
         if state.settings_path is not None:
             _save_settings(state.settings_path, state.settings)
@@ -5289,7 +5835,10 @@ async def unmap_external_folder_endpoint(
         if Path(item) != root and str(item) != raw
     ]
     state.settings['external_library'] = effective_external_library({
-        'external_library': {'folders': folders}
+        'external_library': {
+            **state.settings.get('external_library', {}),
+            'folders': folders,
+        }
     })
     if state.settings_path is not None:
         _save_settings(state.settings_path, state.settings)
@@ -5570,6 +6119,9 @@ def _upgrade_payload(
     payload = runner.status()
     payload['categories'] = list(library_upgrade.CATEGORIES)
     payload['artwork_sources'] = list(cover_sources.ARTWORK_SOURCES)
+    payload['deemix_available'] = bool(
+        (state.settings.get('deemix') or {}).get('enabled')
+    )
     return payload
 
 
@@ -5692,8 +6244,8 @@ def library_summary(request: Request) -> dict[str, Any]:
     """Home-page library stats and a short recent-album shelf.
 
     Avoids sending every ``GET /tracks`` row to the browser when the
-    page only shows counts and a handful of albums. A user sees their
-    own library only.
+    page only shows counts and a handful of albums. A user's counts leave
+    out what an admin hid from users.
     """
 
     return library_home_summary(
@@ -5706,7 +6258,9 @@ def library_albums(request: Request) -> list[dict[str, Any]]:
     """Album tiles for the Library page, without every track row."""
 
     return library_album_index(
-        library_context(), allowed_keys=allowed_entry_keys(request)
+        library_context(),
+        allowed_keys=allowed_entry_keys(request),
+        hidden=admin_hidden_rules(request),
     )
 
 
@@ -5721,8 +6275,171 @@ def library_artists(request: Request) -> list[dict[str, Any]]:
             for path in state.likes.paths(likes_scope(request))
         }
     return library_artist_index(
-        library_context(), liked, allowed_keys=allowed_entry_keys(request)
+        library_context(),
+        liked,
+        allowed_keys=allowed_entry_keys(request),
+        hidden=admin_hidden_rules(request),
     )
+
+
+#: Most items one visibility request may carry.
+MAX_VISIBILITY_ITEMS = 2000
+
+
+def _visibility_store() -> LibraryVisibility:
+    store = state.library_visibility
+    if store is None:
+        raise HTTPException(
+            status_code=503, detail='Library visibility is not ready'
+        )
+    return store
+
+
+def _hidden_paths(rules: HiddenRules) -> set[str]:
+    """Paths of the library rows *rules* hide from users right now."""
+
+    return {
+        str(entry.get('file') or '').replace('\\', '/')
+        for entry in listing_for_request(library_context())
+        if rules.hides(entry)
+    }
+
+
+def _apply_visibility_item(
+    store: LibraryVisibility,
+    action: str,
+    item: dict[str, Any],
+    by_path: dict[str, dict[str, Any]],
+) -> str:
+    """Hide or show one item. Its label when the rules changed, else ``''``."""
+
+    kind = str(item.get('kind') or '')
+    hide = action == 'hide'
+    if kind == library_visibility.KIND_TRACK:
+        file = str(item.get('file') or '').strip().replace('\\', '/')
+        entry = by_path.get(file)
+        title = (
+            str(entry.get('title') or entry.get('name') or file)
+            if entry
+            else file
+        )
+        artist = str(entry.get('artist') or '') if entry else ''
+        label = f'{artist} - {title}' if artist else title
+        if not hide:
+            key = (
+                entry_content_key(entry)
+                if entry
+                else str(item.get('key') or '')
+            )
+            changed = store.show(kind, key) if key else False
+            return (
+                label if store.show_track_by_path(file) > 0 or changed else ''
+            )
+        if entry is None:
+            raise HTTPException(status_code=404, detail='No such track')
+        added = store.hide(
+            kind,
+            entry_content_key(entry),
+            label=label,
+            detail=str(entry.get('album') or ''),
+            path=file,
+        )
+        return label if added else ''
+    if kind == library_visibility.KIND_ALBUM:
+        artist = str(item.get('artist') or '').strip()
+        title = str(item.get('title') or '').strip()
+        if not title:
+            raise HTTPException(status_code=400, detail='Album needs a title')
+        key = library_visibility.album_key(artist, title)
+        if hide:
+            changed = store.hide(kind, key, label=title, detail=artist)
+        else:
+            changed = store.show(kind, key)
+        return title if changed else ''
+    if kind == library_visibility.KIND_ARTIST:
+        name = str(item.get('name') or '').strip()
+        if not name:
+            raise HTTPException(status_code=400, detail='Artist needs a name')
+        key = library_visibility.artist_key(name)
+        if hide:
+            changed = store.hide(kind, key, label=name)
+        else:
+            changed = store.show(kind, key)
+        return name if changed else ''
+    raise HTTPException(status_code=400, detail='Unknown item kind')
+
+
+@router.get('/api/library/visibility')
+def library_visibility_list() -> dict[str, list[dict[str, Any]]]:
+    """What admins hid from users: ``{tracks, albums, artists}``."""
+
+    return _visibility_store().items()
+
+
+@router.post('/api/library/visibility')
+async def library_visibility_update(request: Request) -> dict[str, Any]:
+    """Hide songs, albums or artists from users (or show them again).
+
+    Body: ``{"action": "hide"|"show", "items": [...]}`` where an item is
+    ``{"kind": "track", "file": <library path>}``, ``{"kind": "album",
+    "artist", "title"}`` or ``{"kind": "artist", "name"}``. Admins keep
+    seeing everything either way.
+    """
+
+    payload = await _json_object(request)
+    action = str(payload.get('action') or '')
+    items = payload.get('items')
+    if action not in {'hide', 'show'} or not isinstance(items, list):
+        raise HTTPException(
+            status_code=400, detail='Needs an action and a list of items'
+        )
+    if len(items) > MAX_VISIBILITY_ITEMS:
+        raise HTTPException(status_code=413, detail='Too many items')
+    store = _visibility_store()
+    result = await asyncio.to_thread(_update_visibility, store, action, items)
+    labels = result.pop('labels')
+    if labels:
+        shown = ', '.join(labels[:3]) + (' …' if len(labels) > 3 else '')
+        await log_activity(
+            request,
+            'library_hidden' if action == 'hide' else 'library_shown',
+            shown,
+            {'count': len(labels)},
+        )
+    return result
+
+
+def _update_visibility(
+    store: LibraryVisibility, action: str, items: list[Any]
+) -> dict[str, Any]:
+    entries = listing_for_request(library_context())
+    by_path = {
+        str(entry.get('file') or '').replace('\\', '/'): entry
+        for entry in entries
+    }
+    before = _hidden_paths(store.rules())
+    labels: list[str] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        label = _apply_visibility_item(store, action, item, by_path)
+        if label:
+            labels.append(label)
+    changed = len(labels)
+    if changed:
+        # Users' apps learn from the sync feed: poke every row whose
+        # visibility flipped so the next sync drops or restores it.
+        after = _hidden_paths(store.rules())
+        if state.library_sync is not None:
+            for path in before ^ after:
+                try:
+                    state.library_sync.touch(path)
+                except Exception:
+                    logger.opt(exception=True).debug(
+                        'Could not poke the sync feed for {}', path
+                    )
+        announce_library_changed()
+    return {'changed': changed, 'labels': labels, **store.items()}
 
 
 @router.post('/api/library/lookup')
@@ -5756,6 +6473,96 @@ async def create_library_playlist_endpoint(request: Request) -> dict[str, Any]:
     return result
 
 
+@router.get('/api/library/playlists/external')
+async def external_playlist_candidates(request: Request) -> dict[str, Any]:
+    user_id = request_user_id(request)
+    if not user_id:
+        raise HTTPException(status_code=401, detail='Sign in required')
+    store = state.external_playlist_imports
+    if store is None:
+        raise HTTPException(status_code=503, detail='Starting up')
+    candidates, warnings, truncated = await asyncio.to_thread(
+        discover_external_playlists, library_context()
+    )
+    imported = await asyncio.to_thread(store.imported, user_id)
+    rows = []
+    for candidate in candidates:
+        files = filter_paths_for_request(list(candidate.files), request)
+        if not files and candidate.files and not request_is_admin(request):
+            continue
+        rows.append({
+            'source_id': candidate.source_id,
+            'revision': candidate.revision,
+            'name': candidate.name,
+            'folder': candidate.folder,
+            'files': files,
+            'count': len(files),
+            'missing': candidate.missing + len(candidate.files) - len(files),
+            'duplicates': candidate.duplicates,
+            'imported_name': imported.get(candidate.source_id, ''),
+        })
+    return {'playlists': rows, 'warnings': warnings, 'truncated': truncated}
+
+
+@router.post('/api/library/playlists/external')
+async def import_external_playlists_endpoint(
+    request: Request,
+) -> dict[str, Any]:
+    user_id = request_user_id(request)
+    if not user_id:
+        raise HTTPException(status_code=401, detail='Sign in required')
+    payload = await _json_object(request)
+    selected = payload.get('selected')
+    if (
+        not isinstance(selected, list)
+        or not 1 <= len(selected) <= 50
+        or not all(isinstance(item, dict) for item in selected)
+    ):
+        raise HTTPException(
+            status_code=400, detail='Choose between 1 and 50 playlists'
+        )
+    store = state.external_playlist_imports
+    if store is None:
+        raise HTTPException(status_code=503, detail='Starting up')
+    ctx = library_context()
+    candidates, _, _ = await asyncio.to_thread(
+        discover_external_playlists, ctx
+    )
+    by_id = {item.source_id: item for item in candidates}
+    results = []
+    for wanted in selected:
+        candidate = by_id.get(str(wanted.get('source_id') or ''))
+        if candidate is None or wanted.get('revision') != candidate.revision:
+            results.append({
+                'source_id': wanted.get('source_id'),
+                'status': 'changed',
+                'detail': 'Refresh the preview before importing',
+            })
+            continue
+        files = filter_paths_for_request(list(candidate.files), request)
+        if not files:
+            results.append({
+                'source_id': candidate.source_id,
+                'status': 'unavailable',
+                'detail': 'No accessible tracks found',
+            })
+            continue
+        try:
+            result = await asyncio.to_thread(
+                store.import_snapshot, ctx, user_id, candidate, files
+            )
+            results.append(result)
+        except (ManualPlaylistError, OSError):
+            results.append({
+                'source_id': candidate.source_id,
+                'status': 'error',
+                'detail': 'Playlist could not be imported',
+            })
+    invalidate_library_paths_cache()
+    await announce_playlists_changed()
+    return {'results': results}
+
+
 @router.post('/api/library/playlists/tracks')
 async def edit_library_playlist_tracks_endpoint(
     request: Request,
@@ -5764,7 +6571,15 @@ async def edit_library_playlist_tracks_endpoint(
 
     payload = await _json_object(request)
     name = str(payload.get('name') or '').strip()
-    require_playlist_visible(name, request)
+    require_playlist_visible(name, request, manage=True)
+    source_url = str(payload.get('source_playlist_url') or '').strip()
+    cover_target = (
+        _playlist_target_for_batch(source_url) if source_url else None
+    )
+    if source_url and cover_target is None:
+        raise HTTPException(
+            status_code=400, detail='Invalid playlist source URL'
+        )
     add = payload.get('add') if isinstance(payload.get('add'), list) else []
     remove = (
         payload.get('remove')
@@ -5784,6 +6599,17 @@ async def edit_library_playlist_tracks_endpoint(
         raise HTTPException(
             status_code=exc.status_code, detail=str(exc)
         ) from exc
+    if cover_target is not None:
+        path = m3u.find_m3u_for_name(ctx.download_dir, name)
+        if path is not None:
+            saved = await asyncio.to_thread(
+                _download_playlist_cover_for_batch,
+                *cover_target,
+                path,
+                state.settings,
+            )
+            if saved:
+                await asyncio.to_thread(keep_explicit_cover, path)
     invalidate_library_paths_cache()
     return result
 
@@ -5795,7 +6621,39 @@ async def rename_library_playlist_endpoint(request: Request) -> dict[str, Any]:
     payload = await _json_object(request)
     name = str(payload.get('name') or '').strip()
     new_name = str(payload.get('new_name') or '').strip()
-    require_playlist_visible(name, request)
+    entry = require_playlist_visible(name, request, manage=True)
+    if not entry.get('manual'):
+        if entry.get('liked'):
+            raise HTTPException(
+                status_code=403, detail='Liked songs cannot be renamed'
+            )
+        reset = payload.get('reset_display_name') is True
+        if not reset and (not new_name or len(new_name) > 120):
+            raise HTTPException(
+                status_code=400,
+                detail='Enter a name of at most 120 characters',
+            )
+        if not reset and is_liked_playlist(new_name):
+            raise HTTPException(
+                status_code=409, detail='That playlist name is reserved'
+            )
+        for other in playlists_for_request(request):
+            if other['name'] != entry['name'] and share_key(
+                other.get('display_name', other['name'])
+            ) == share_key(new_name):
+                raise HTTPException(
+                    status_code=409,
+                    detail='A playlist with that name already exists',
+                )
+        if state.playlist_shares is None:
+            raise HTTPException(status_code=503, detail='Starting up')
+        await asyncio.to_thread(
+            state.playlist_shares.set_display_name,
+            playlist_display_identity(entry),
+            '' if reset else new_name,
+        )
+        await announce_playlists_changed()
+        return {**entry, 'display_name': entry['name'] if reset else new_name}
     ctx = library_context()
     try:
         result = await asyncio.to_thread(
@@ -5816,8 +6674,488 @@ async def rename_library_playlist_endpoint(request: Request) -> dict[str, Any]:
             logger.opt(exception=True).debug(
                 'Could not move owner for playlist {!r}', name
             )
+    if state.external_playlist_imports is not None:
+        await asyncio.to_thread(
+            state.external_playlist_imports.rename,
+            name,
+            str(result.get('name') or new_name),
+        )
+    if state.playlist_shares is not None:
+        try:
+            await asyncio.to_thread(
+                state.playlist_shares.rename,
+                name,
+                str(result.get('name') or new_name),
+            )
+        except Exception:
+            logger.opt(exception=True).debug(
+                'Could not move sharing for playlist {!r}', name
+            )
     invalidate_library_paths_cache()
+    await announce_playlists_changed()
     return result
+
+
+async def announce_playlists_changed() -> None:
+    """Tell connected clients playlists were shared, followed, copied,
+    detached, renamed or deleted, so they list them again."""
+
+    await state.connections.broadcast({'type': 'playlists_changed'})
+
+
+@router.put('/api/library/playlists/favorite')
+async def set_playlist_favorite_endpoint(request: Request) -> dict[str, Any]:
+    """Pin an accessible playlist for the signed-in account only."""
+    user_id = request_user_id(request)
+    if not user_id:
+        raise HTTPException(status_code=401, detail='Sign in required')
+    payload = await _json_object(request)
+    name = str(payload.get('name') or '').strip()
+    favorite = payload.get('favorite')
+    if not isinstance(favorite, bool):
+        raise HTTPException(
+            status_code=400, detail='favorite must be a boolean'
+        )
+    if state.playlist_shares is None:
+        raise HTTPException(status_code=503, detail='Starting up')
+    if favorite:
+        entry = require_playlist_visible(name, request)
+        name = str(entry['name'])
+    elif not name:
+        raise HTTPException(status_code=400, detail='name is required')
+    await asyncio.to_thread(
+        state.playlist_shares.set_favorite,
+        user_id,
+        playlist_favorite_identity({'name': name}),
+        favorite,
+    )
+    await announce_playlists_changed()
+    return {'name': name, 'favorite': favorite}
+
+
+def _owner_of(entry: dict[str, Any]) -> int:
+    """The user id that owns the playlist *entry* (``0``: nobody)."""
+
+    if entry.get('owner_id') is not None:
+        return int(entry['owner_id'] or 0)
+    catalog_names, manual_owners = _playlist_owner_maps()
+    owners = manual_owners if entry.get('manual') else catalog_names
+    return int(owners.get(share_key(str(entry.get('name') or '')), 0))
+
+
+@router.put('/api/library/playlists/visibility')
+async def set_playlist_visibility_endpoint(
+    request: Request,
+) -> dict[str, Any]:
+    """Share a playlist you own (view-only): ``{name, visibility,
+    shared_with}`` with ``visibility`` ``private`` (the default),
+    ``shared`` (with the usernames in ``shared_with``) or ``public``
+    (everyone on the server). Liked songs are never shareable."""
+
+    payload = await _json_object(request)
+    name = str(payload.get('name') or '').strip()
+    visibility = str(payload.get('visibility') or '').strip().lower()
+    if visibility not in VISIBILITIES:
+        raise HTTPException(status_code=400, detail='Unknown visibility')
+    if is_liked_playlist(name):
+        raise HTTPException(
+            status_code=400, detail='Liked songs cannot be shared'
+        )
+    entry = require_playlist_visible(name, request, manage=True)
+    shares = state.playlist_shares
+    if shares is None:
+        raise HTTPException(status_code=503, detail='Starting up')
+    if visibility != PRIVATE and not sharing_enabled():
+        raise HTTPException(
+            status_code=403, detail='Sharing playlists is turned off'
+        )
+    owner_id = _owner_of(entry)
+    if not owner_id:
+        raise HTTPException(
+            status_code=400, detail='This playlist has no owner to share it'
+        )
+    wanted = payload.get('shared_with')
+    by_name = {
+        username.casefold(): uid for uid, username in _usernames().items()
+    }
+    user_ids: list[int] = []
+    for raw in wanted if isinstance(wanted, list) else []:
+        uid = by_name.get(str(raw or '').strip().casefold())
+        if uid is None:
+            raise HTTPException(status_code=400, detail=f'Unknown user {raw}')
+        if uid != owner_id and uid not in user_ids:
+            user_ids.append(uid)
+    if visibility == SHARED and not user_ids:
+        raise HTTPException(
+            status_code=400, detail='Choose who to share the playlist with'
+        )
+    stored = str(entry.get('name') or name)
+    await asyncio.to_thread(
+        shares.set_visibility, stored, visibility, user_ids
+    )
+    await announce_playlists_changed()
+    usernames = _usernames()
+    return {
+        'name': stored,
+        'visibility': visibility,
+        'shared_with': [
+            usernames[uid] for uid in user_ids if uid in usernames
+        ],
+    }
+
+
+@router.post('/api/library/playlists/copy')
+async def copy_library_playlist_endpoint(request: Request) -> dict[str, Any]:
+    """Save a copy of a playlist you can open (your own, one shared with
+    you or a public one) as a new playlist of yours, which you can edit.
+    ``{name, new_name?}``; songs an admin hid from users are left out."""
+
+    payload = await _json_object(request)
+    name = str(payload.get('name') or '').strip()
+    entry = require_playlist_visible(name, request)
+    ctx = library_context()
+    files = await asyncio.to_thread(
+        filter_paths_for_request, list(entry.get('files') or []), request
+    )
+    taken = existing_playlist_names(ctx.download_dir)
+    new_name = str(payload.get('new_name') or '').strip()
+    if not new_name:
+        base = f'{entry.get("name") or name} (copy)'
+        new_name = base
+        number = 2
+        while new_name.casefold() in taken:
+            new_name = f'{base} {number}'
+            number += 1
+    try:
+        result = await asyncio.to_thread(copy_playlist, ctx, files, new_name)
+    except ManualPlaylistError as exc:
+        raise HTTPException(
+            status_code=exc.status_code, detail=str(exc)
+        ) from exc
+    claim_manual_playlist(str(result.get('name') or new_name), request)
+    invalidate_library_paths_cache()
+    await announce_playlists_changed()
+    return result
+
+
+def _unlink_imported_playlist(entry: dict[str, Any], name: str) -> None:
+    """Forget where an imported playlist came from: its catalog row (and
+    cached Spotify tracks and batches), its watch, and move its owner to
+    the Library playlists'."""
+
+    owner_id = _owner_of(entry)
+    key = share_key(name)
+    sid = ''
+    catalog = state.playlist_catalog
+    if catalog is not None:
+        exact = next(
+            (n for n in catalog.list_playlist_names() if share_key(n) == key),
+            None,
+        )
+        if exact is not None:
+            sid = catalog.spotify_id_for_playlist(exact) or ''
+            catalog.delete_playlist(exact)
+    if state.manual_playlist_owners is not None and owner_id:
+        state.manual_playlist_owners.set_owner(name, owner_id)
+    # Nothing rewrites it from a source any more: hidden songs simply
+    # aren't in it, and can be added back like any other song.
+    if state.playlist_hidden is not None:
+        state.playlist_hidden.forget(name)
+    if state.monitor_db is not None:
+        for watch in state.monitor_db.list_playlists(owner_id or None):
+            if watch.kind == KIND_PLAYLIST and (
+                share_key(watch.name) == key
+                or (sid and watch.spotify_id == sid)
+            ):
+                state.monitor_db.delete_playlist(watch.id)
+    if not sid:
+        return
+    if state.playlist_batch_store is not None:
+        state.playlist_batch_store.delete_for_spotify_playlist(
+            sid, user_id=owner_id
+        )
+    still_used = catalog is not None and any(
+        row['spotify_id'] == sid
+        for row in catalog.list_playlists_with_spotify_id()
+    )
+    if state.playlist_spotify_cache is not None and not still_used:
+        state.playlist_spotify_cache.delete_playlist(sid)
+
+
+@router.post('/api/library/playlists/detach')
+async def detach_library_playlist_endpoint(
+    request: Request,
+) -> dict[str, Any]:
+    """Make an imported (Spotify / YouTube Music) playlist a Library one
+    so it can be edited: tracks and owner stay, the link to its source
+    and its watch go. ``{name}``."""
+
+    payload = await _json_object(request)
+    name = str(payload.get('name') or '').strip()
+    entry = require_playlist_visible(name, request, manage=True)
+    if entry.get('liked') or entry.get('manual'):
+        raise HTTPException(
+            status_code=409, detail='This playlist can already be edited'
+        )
+    ctx = library_context()
+    try:
+        result = await asyncio.to_thread(
+            detach_imported_playlist, ctx, str(entry.get('name') or name)
+        )
+    except ManualPlaylistError as exc:
+        raise HTTPException(
+            status_code=exc.status_code, detail=str(exc)
+        ) from exc
+    try:
+        await asyncio.to_thread(
+            _unlink_imported_playlist, entry, str(result['name'])
+        )
+    except Exception:
+        logger.opt(exception=True).warning(
+            'Could not unlink {!r} from its source', result['name']
+        )
+    invalidate_library_paths_cache()
+    await announce_playlists_changed()
+    return result
+
+
+def _require_playlist_hidden() -> PlaylistHiddenSongs:
+    if state.playlist_hidden is None:
+        raise HTTPException(status_code=503, detail='Starting up')
+    return state.playlist_hidden
+
+
+def _imported_playlist_to_change(
+    name: str, request: Optional[Request]
+) -> dict[str, Any]:
+    """Imported playlist *name*'s entry, when *request* may change it -
+    the owner's or, for an admin, anyone's. 409 for a Library playlist
+    (it is edited instead) and for liked songs."""
+
+    entry = require_playlist_visible(name, request, manage=True)
+    if entry.get('liked') or entry.get('manual'):
+        raise HTTPException(
+            status_code=409,
+            detail='Songs are removed from a Library playlist, not hidden',
+        )
+    return entry
+
+
+def hidden_playlist_songs(
+    name: str, request: Optional[Request]
+) -> dict[str, Any]:
+    """``{name, songs}``: the songs hidden from imported playlist *name*,
+    most recently hidden first, each ``{key, label, file, present,
+    hidden_at}`` - ``present`` while its file is still in the library."""
+
+    entry = _imported_playlist_to_change(name, request)
+    rows = _require_playlist_hidden().items(entry['name'])
+    ctx = library_context()
+    return {
+        'name': entry['name'],
+        'songs': [
+            {
+                'key': row['key'],
+                'label': row['label'],
+                'file': row['file'],
+                'present': bool(row['file'])
+                and resolve_library_file(row['file'], ctx) is not None,
+                'hidden_at': row['hidden_at'],
+            }
+            for row in rows
+        ],
+    }
+
+
+async def change_hidden_playlist_songs(
+    request: Request, name: str, hide: list[str], show: list[str]
+) -> dict[str, Any]:
+    """Hide the library files *hide* from imported playlist *name* and
+    show the hidden songs *show* (their ``key``) again - for the web page
+    and the apps alike. ``{name, hidden, keys, shown, restored, files,
+    count}``: ``keys`` are the hidden songs' (what *show* takes to undo
+    it); ``restored`` of the ``shown`` songs went back into the playlist
+    (the others' files are gone; the source brings them back)."""
+
+    if not hide and not show:
+        raise HTTPException(status_code=400, detail='Nothing to hide or show')
+    entry = _imported_playlist_to_change(name, request)
+    store = _require_playlist_hidden()
+    ctx = library_context()
+    stored = str(entry['name'])
+    result: dict[str, Any] = {
+        'name': stored,
+        'hidden': 0,
+        'keys': [],
+        'shown': 0,
+        'restored': 0,
+    }
+    try:
+        if show:
+            result.update(
+                await asyncio.to_thread(
+                    show_playlist_songs,
+                    ctx,
+                    store,
+                    stored,
+                    show,
+                    catalog=state.playlist_catalog,
+                )
+            )
+        if hide:
+            ids = await asyncio.to_thread(
+                source_track_ids,
+                stored,
+                hide,
+                catalog=state.playlist_catalog,
+                monitor_db=state.monitor_db,
+            )
+            result.update(
+                await asyncio.to_thread(
+                    hide_playlist_songs,
+                    ctx,
+                    store,
+                    stored,
+                    hide,
+                    track_ids=ids,
+                    catalog=state.playlist_catalog,
+                )
+            )
+    except HiddenSongsError as exc:
+        raise HTTPException(
+            status_code=exc.status_code, detail=str(exc)
+        ) from exc
+    invalidate_library_paths_cache()
+    if _navidrome_playlist_sync_on():
+        spawn_task(
+            asyncio.to_thread(_sync_navidrome_playlist, stored),
+            name='navidrome-sync-hidden-songs',
+        )
+    await announce_playlists_changed()
+    return result
+
+
+def _navidrome_playlist_sync_on() -> bool:
+    settings = state.settings
+    return settings.get('sync_navidrome', True) is not False and bool(
+        _effective_navidrome_settings(settings).get('enabled')
+    )
+
+
+def _sync_navidrome_playlist(name: str) -> None:
+    """Mirror playlist *name*'s M3U into its Navidrome playlist (best
+    effort)."""
+
+    settings = state.settings
+    ctx = library_context()
+    path = m3u.find_m3u_for_name(ctx.download_dir, name)
+    if path is None:
+        return
+    files = m3u.read_m3u_tracks(
+        path, ctx.download_dir, ctx.slskd_dir, tuple(ctx.extra_dirs or ())
+    )
+    songs = [
+        enrich_song_from_library_file(
+            {'filename': stored}, ctx.download_dir, ctx.slskd_dir
+        )
+        for stored in files
+    ]
+    # A watch named its Navidrome playlist with the source's own name.
+    synced = next(iter(catalog_names_for(state.playlist_catalog, name)), name)
+    try:
+        sync_playlist_to_navidrome(
+            synced,
+            songs,
+            settings,
+            navidrome_index=state.navidrome_index,
+            download_dir=ctx.download_dir,
+            trigger_scan=False,
+        )
+    except Exception:
+        logger.opt(exception=True).warning(
+            'Navidrome sync failed for {!r}', synced
+        )
+
+
+@router.get('/api/library/playlists/details')
+async def playlist_details_endpoint(
+    request: Request, name: str = Query(..., min_length=1)
+) -> dict[str, Any]:
+    """What the playlist page filters its songs by, for a playlist the
+    caller can open: ``{name, providers, navidrome}`` - ``providers`` is
+    ``{file: provider}`` for the songs whose provider is known, and
+    ``navidrome`` is ``{enabled, unmatched}``: while Navidrome sync is on,
+    the songs that have no Navidrome song id yet."""
+
+    entry = require_playlist_visible(name, request)
+    files = await asyncio.to_thread(
+        filter_paths_for_request, list(entry.get('files') or []), request
+    )
+    return await asyncio.to_thread(
+        _playlist_details, str(entry['name']), files
+    )
+
+
+def _playlist_details(name: str, files: list[str]) -> dict[str, Any]:
+    by_file = {
+        str(row.get('file') or '').replace('\\', '/'): row
+        for row in listing_for_request(library_context())
+    }
+    keys = {
+        path: entry_content_key(by_file[path]) if path in by_file else ''
+        for path in dict.fromkeys(files)
+    }
+    enabled = (
+        _navidrome_playlist_sync_on() and state.navidrome_index is not None
+    )
+    unmatched: list[str] = []
+    if enabled:
+        try:
+            matched = state.navidrome_index.matched_files(keys)
+        except Exception:
+            logger.opt(exception=True).warning(
+                'Could not read the Navidrome matches of {!r}', name
+            )
+            matched = set(keys)
+        unmatched = [path for path in keys if path not in matched]
+    return {
+        'name': name,
+        'providers': providers_for(state.file_providers, keys),
+        'navidrome': {'enabled': enabled, 'unmatched': unmatched},
+    }
+
+
+@router.get('/api/library/playlists/hidden')
+async def hidden_playlist_songs_endpoint(
+    request: Request, name: str = Query(..., min_length=1)
+) -> dict[str, Any]:
+    """The songs hidden from an imported playlist you can change."""
+
+    return await asyncio.to_thread(hidden_playlist_songs, name, request)
+
+
+@router.post('/api/library/playlists/hidden')
+async def change_hidden_playlist_songs_endpoint(
+    request: Request,
+) -> dict[str, Any]:
+    """Hide songs from an imported playlist - and keep them out of it
+    when its watch or its link brings them back - or show them again:
+    ``{name, hide: [library paths], show: [hidden song keys]}``. The
+    audio files stay in the library; the source playlist is untouched."""
+
+    payload = await _json_object(request)
+    return await change_hidden_playlist_songs(
+        request,
+        str(payload.get('name') or '').strip(),
+        _string_list(payload.get('hide')),
+        _string_list(payload.get('show')),
+    )
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if str(item or '').strip()]
 
 
 @router.delete('/api/library/playlist')
@@ -5872,9 +7210,7 @@ async def _delete_playlist_by_name(
 
         result = await asyncio.to_thread(_run)
     else:
-        match = playlist_entry_for_request(playlist_name, request)
-        if match is None:
-            raise HTTPException(status_code=404, detail='Playlist not found')
+        match = require_playlist_visible(playlist_name, request, manage=True)
         result = await _delete_owned_playlist(request, match)
     if not result.get('ok'):
         raise HTTPException(
@@ -5885,6 +7221,15 @@ async def _delete_playlist_by_name(
     if affected:
         await _schedule_playlist_refresh_after_delete(affected)
     result['playlists_refresh_scheduled'] = bool(affected)
+    if state.playlist_shares is not None:
+        await asyncio.to_thread(state.playlist_shares.forget, playlist_name)
+    if state.playlist_hidden is not None:
+        await asyncio.to_thread(state.playlist_hidden.forget, playlist_name)
+    if state.external_playlist_imports is not None:
+        await asyncio.to_thread(
+            state.external_playlist_imports.forget, playlist_name
+        )
+    await announce_playlists_changed()
     return result
 
 
@@ -6315,7 +7660,12 @@ async def write_playlist_m3u_endpoint(request: Request) -> dict[str, Any]:
         logger.exception('Failed to resolve playlist {}', playlist_url)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    entries = [t for t in tracks if isinstance(t, dict)]
+    hidden = hidden_songs_for(playlist_name)
+    entries = [
+        t
+        for t in tracks
+        if isinstance(t, dict) and not hidden.hides_file(t.get('filename'))
+    ]
     playlist_subdir = m3u.sanitize_playlist_name(playlist_name)
     organize = _organize_enabled()
     target, kept = m3u.write_m3u(
@@ -6435,6 +7785,21 @@ async def update_settings_endpoint(
         pending = {**state.settings, **payload}
         slskd_cfg = _effective_slskd_settings(pending)
         navidrome_cfg = _effective_navidrome_settings(pending)
+        deemix_cfg = _effective_deemix_settings(pending)
+        if deemix_cfg['enabled']:
+            try:
+                validate_deemix_settings(deemix_cfg)
+            except DeemixError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from None
+            external = effective_external_library(pending)
+            folder = deemix_cfg['source_dir']
+            if folder not in external['folders']:
+                if len(external['folders']) >= 20:
+                    raise HTTPException(
+                        status_code=400, detail='Too many library folders'
+                    )
+                external['folders'].append(folder)
+            payload = {**payload, 'external_library': external}
         _validate_integration_settings(
             slskd_cfg if 'slskd' in payload else {},
             navidrome_cfg if 'navidrome' in payload else {},
@@ -6467,6 +7832,8 @@ async def update_settings_endpoint(
                 }
             elif key == 'navidrome':
                 state.settings[key] = navidrome_cfg
+            elif key == 'deemix':
+                state.settings[key] = deemix_cfg
             elif key == 'external_library':
                 state.settings[key] = effective_external_library({
                     'external_library': raw_value
@@ -6479,14 +7846,18 @@ async def update_settings_endpoint(
                 state.settings[key] = str(raw_value or '').strip()
             else:
                 state.settings[key] = raw_value
-        if {'audio_providers', 'slskd'} & set(payload):
+        if {'audio_providers', 'slskd', 'deemix'} & set(payload):
             state.settings['audio_providers'] = _effective_audio_providers(
                 state.settings
             )
         if state.downloader is not None:
-            if {'audio_providers', 'slskd', 'max_parallel_downloads'} & set(
-                payload
-            ):
+            state.downloader.deemix_settings = deemix_cfg
+            if {
+                'audio_providers',
+                'slskd',
+                'deemix',
+                'max_parallel_downloads',
+            } & set(payload):
                 state.downloader.slskd_settings = (
                     state.downloader._normalize_slskd_settings(
                         _effective_slskd_settings(state.settings)
@@ -6568,6 +7939,14 @@ async def _json_object(request: Request) -> dict[str, Any]:
     except Exception:
         return {}
     return payload if isinstance(payload, dict) else {}
+
+
+@router.post('/api/deemix/test')
+async def test_deemix_endpoint(request: Request) -> dict[str, Any]:
+    """Test the unsaved Deemix form without adding any queue item."""
+    payload = await _json_object(request)
+    cfg = normalize_deemix_settings(payload or state.settings.get('deemix'))
+    return await asyncio.to_thread(check_deemix, cfg)
 
 
 @router.post('/api/slskd/test')
@@ -6929,6 +8308,46 @@ async def song_preview_endpoint(
     except ValueError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {'preview_url': url}
+
+
+@router.get('/api/buy')
+async def buy_links_endpoint(
+    artist: str = Query('', max_length=200),
+    title: str = Query('', max_length=300),
+    album: str = Query('', max_length=300),
+    country: str = Query('', max_length=8),
+) -> dict[str, Any]:
+    """Where to buy a song (``title``), an album (``album``, no title) or
+    an artist's music (``artist`` alone), to support the artist - see
+    :mod:`downtify.buy_links`. ``country`` (two letters, ``US`` by
+    default) picks the iTunes store. ``{kind, query, links}``."""
+
+    artist = artist.strip()
+    if not artist:
+        raise HTTPException(status_code=400, detail='artist is required')
+    website = await asyncio.to_thread(_artist_website, artist)
+    return await asyncio.to_thread(
+        buy_links,
+        artist,
+        title,
+        album,
+        country=country,
+        website=website,
+    )
+
+
+def _artist_website(name: str) -> str:
+    """The website in *name*'s saved profile (``''`` without one; a
+    profile is never fetched for this)."""
+
+    try:
+        profile = artist_profile.load_profile(
+            _artist_profile_download_dir(), name
+        )
+    except Exception:
+        logger.opt(exception=True).debug('Could not read profile of {}', name)
+        return ''
+    return str((profile.get('social') or {}).get('website') or '')
 
 
 @router.get('/api/similar/tracks')

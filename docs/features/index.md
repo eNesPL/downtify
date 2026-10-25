@@ -15,12 +15,14 @@ Downtify covers everything you need to build and maintain a local music library 
 | [Finder](finder.md) | Search Deezer, then browse an artist, their albums and any album's tracks in columns |
 | [Download Settings](download-settings.md) | Choose format (MP3/FLAC/M4A/OGG/OPUS), bitrate, parallel downloads and delay between downloads |
 | [Playlist Monitor](playlist-monitor.md) | Watch Spotify or YouTube Music playlists and artists, and auto-download new tracks and releases |
+| [Hidden playlist songs](hidden-playlist-songs.md) | Take songs you don't want out of a downloaded or watched playlist and keep them out; the files stay in your library |
 | [Top Songs](top-songs.md) | Paste an artist link and download their most popular songs, optionally as a playlist |
 | [Library Import (CSV)](library-import.md) | Import a library export from Soundiiz, TuneMyMusic or Exportify and queue the whole thing |
 | [Built-in Player](player.md) | Play your library in the browser: queue management, synced lyrics, sleep timer, keyboard and media keys |
 | [Liked songs](liked-songs.md) | Heart a song to like it; a playlist of everything you have liked appears on its own |
 | [Podcasts](podcasts.md) | Subscribe to a show by RSS feed, Spotify link or name; new episodes download and tag on their own |
 | [Users & Sign-in](users.md) | Username and password sign-in (`admin` / `downtify` on a new server), admin and normal user accounts, per-user preferences, and an activity log of sign-ins and what everyone plays |
+| [Explicit Marker](explicit-marker.md) | The "E" next to songs with explicit lyrics - in search, the Library and the player - and in the file's tags |
 | [Replace Audio](replace-audio.md) | Wrong song or version? Pick the right one on YouTube Music or YouTube; the file keeps its name, tags and playlists |
 | [Server Settings](server.md) | The port Downtify listens on, changed from Settings (admins), with a restart right away if you like |
 | [Mobile Apps](mobile-apps.md) | Pair phone apps by QR code and stream the library to them (original or transcoded) |
@@ -32,10 +34,11 @@ Downtify covers everything you need to build and maintain a local music library 
 | [M3U Export](m3u-export.md) | Auto-generated playlist files for Jellyfin, Navidrome, Plex and any media app |
 | [Playlist cover art](playlist-cover-art.md) | Save the playlist's own cover image alongside its M3U file |
 | [Artist photo, banner & bio](artist-images.md) | Pick a real photo and banner for an artist from YouTube Music, Deezer, Spotify or your own upload, and fetch their bio, origin and links from Apple Music and Deezer, automatically or on demand |
+| [Support the Artist](support-artists.md) | Find where to buy a song, album or artist: the iTunes Store item with its price, Bandcamp and Qobuz, the artist's website |
 | [File Organization](file-organization.md) | Flat layout or per-artist subfolders |
 | [Lyrics](lyrics.md) | Automatically download and embed lyrics (plain and time-synced); `.lrc` next to the file or in a folder you choose |
 | [YouTube Cookies](youtube-cookies.md) | Upload a `cookies.txt` from the web UI to download explicit/age-restricted tracks |
-| [Internationalization](internationalization.md) | English plus seven more languages out of the box |
+| [Internationalization](internationalization.md) | English plus nine more languages out of the box, and the documentation in all of them |
 | [Update Notifications](updates.md) | Hourly check against GitHub Releases; a notice appears in the sidebar when a newer version is out |
 
 ## Input types

@@ -2,8 +2,51 @@ import recognition from '../recognition.js'
 
 export default {
   recognition,
+  playlistNames: { restore: 'Restore source name' },
+  playlistFavorites: {
+    title: 'Favorite playlists',
+    add: 'Add playlist to favorites',
+    remove: 'Remove playlist from favorites',
+  },
+  externalPlaylistImport: {
+    open: 'Import folder playlists',
+    title: 'Playlists in your music folders',
+    hint: 'Select the playlists to add, up to 50 at a time. Only available tracks are referenced. Source files and audio are never changed.',
+    loading: 'Looking for playlist files…',
+    empty: 'No M3U or M3U8 playlist files found in the added folders.',
+    counts:
+      '{count} available · {missing} unavailable · {duplicates} repeated entries',
+    existing: 'Already added as {name}',
+    preview: 'Preview the first 30 tracks',
+    truncated: 'The scan reached its limit; this list is incomplete.',
+    add: 'Add selected playlists ({count})',
+    result:
+      '{added} added · {existing} already present · {failed} need a new preview or could not be imported',
+  },
   language: {
     name: 'English',
+  },
+  buy: {
+    menu: 'Support the artist',
+    title: 'Support the artist',
+    body: 'Buy the music, or visit the artist’s own website.',
+    inStore: 'Open it in the store',
+    search: 'Search for “{query}”',
+    website: 'Official website',
+    failed: 'Couldn’t look it up in the stores.',
+    note: 'Bandcamp passes most of each sale on to the artist. These are plain links: Downtify doesn’t sell anything or earn from them.',
+  },
+  playlistSearch: {
+    placeholder: 'Search this playlist',
+    all: 'All',
+    missing: 'Missing',
+    failed: 'Failed',
+    notInNavidrome: 'Not in Navidrome',
+    fromFolders: 'Your folders',
+    unknownSource: 'Unknown source',
+    showing: '{count} of {total}',
+    noMatch: 'Nothing here matches',
+    noMatchHint: 'Try other words, or another filter.',
   },
   common: {
     cancel: 'Cancel',
@@ -17,6 +60,7 @@ export default {
     seeAll: 'See all',
     show: 'Show',
     hide: 'Hide',
+    undo: 'Undo',
     unknownArtist: 'Unknown artist',
     tracks: { one: '{count} track', other: '{count} tracks' },
     albums: { one: '{count} album', other: '{count} albums' },
@@ -220,6 +264,11 @@ export default {
     redownloadAll: 'Download all again',
     downloadSelected: 'Download selected',
     allInLibrary: 'All in your library',
+    allHandled: 'Already in your library or queue',
+    addPlaylist: 'Add to my playlists',
+    noAvailableTracks: 'No downloaded tracks are available to add yet.',
+    saveAvailableHint:
+      '{count} of {total} tracks are available. Audio files are reused; missing tracks will not be downloaded.',
     watchPlaylist: 'Watch for new tracks',
     watchArtist: 'Watch for new releases',
     openSpotify: 'Open on Spotify',
@@ -299,6 +348,19 @@ export default {
     sortArtist: 'Artist',
     sortYear: 'Year',
     sortTrackCount: 'Number of tracks',
+    trackSort: {
+      order: 'Playlist order',
+      addedNew: 'Recently added',
+      addedOld: 'Oldest added',
+      titleAsc: 'Title (A–Z)',
+      titleDesc: 'Title (Z–A)',
+      artistAsc: 'Artist (A–Z)',
+      artistDesc: 'Artist (Z–A)',
+      albumAsc: 'Album (A–Z)',
+      albumDesc: 'Album (Z–A)',
+      longest: 'Longest first',
+      shortest: 'Shortest first',
+    },
     viewGrid: 'Grid',
     viewList: 'List',
     emptyTitle: 'Your library is empty',
@@ -337,6 +399,28 @@ export default {
     failed: "Couldn't update the like",
   },
   upgrade: {
+    chooseRecording: 'Choose a Deezer recording',
+    chooseRecordingHint:
+      'Review an exact recording when old album tags do not match. The artist and full title must still match.',
+    recordingLink: 'Deezer track link',
+    previewRecording: 'Preview',
+    recordingReviewHint:
+      'Review the album and duration. This prepares a single-track scan; replacement starts only after you confirm the scan.',
+    analyzeRecording: 'Analyze this choice',
+    recordingPreviewFailed: 'Unable to preview this Deezer track.',
+    replacementRescan: 'Options changed: scan again before starting.',
+    deemixTitle: 'Replace recordings with Deemix',
+    replaceAudio: 'Use verified Deemix recordings',
+    replaceAudioHint:
+      'Match the exact artist, title and album. Keep music in the Deemix folder. Ambiguous matches leave originals untouched. This scan replaces audio instead of retagging it.',
+    deleteOriginals: 'Remove old Downtify audio after import',
+    deleteOriginalsHint:
+      'Only remove each verified original after playlists, likes and playback references are updated. External files and sidecars are never removed.',
+    replacementProgress:
+      'Awaiting publication or cleanup: {pending}. Old copies removed: {removed}. Originals kept: {kept}.',
+    audio: 'Deemix recordings',
+    audioHint:
+      'Verify catalog duration and decoded audio before updating playlists and removing an old copy.',
     title: 'Upgrade library',
     subtitle:
       'Improve music you already downloaded, instead of downloading it again.',
@@ -527,6 +611,19 @@ export default {
     },
     alreadyIn: 'Already in “{name}”',
     removedTrack: 'Removed from “{name}”',
+    hideTrack: 'Hide from playlist',
+    hiddenTrack: 'Hidden from “{name}”',
+    hiddenTitle: {
+      one: '{count} hidden song',
+      other: '{count} hidden songs',
+    },
+    hiddenHint:
+      'Songs you hid from this playlist. They stay out when it syncs with its source, and stay in your library.',
+    hiddenGone: 'No longer in your library',
+    unhide: 'Show again',
+    unhidden: 'Back in “{name}”',
+    unhiddenLater:
+      'It returns to “{name}” when the playlist downloads what it’s missing',
     created: 'Created “{name}”',
     rename: 'Rename',
     renameTitle: 'Rename playlist',
@@ -719,6 +816,52 @@ export default {
     saved: 'Watch updated',
     retargeted: 'Now watching {name}',
   },
+  sharing: {
+    title: 'Share “{name}”',
+    hint: 'People you share with can play it, follow it and save a copy. They can’t change it.',
+    private: 'Private',
+    privateHint: 'Only you can see it.',
+    shared: 'Specific people',
+    sharedHint: 'Choose who can see it.',
+    public: 'Public',
+    publicHint: 'Everyone on this server can see it.',
+    noOtherUsers: 'There are no other accounts to share with.',
+    findUser: 'Find a person',
+    loadingUsers: 'Loading people…',
+    saved: {
+      private: '“{name}” is private again',
+      shared: 'Shared “{name}”',
+      public: '“{name}” is now public',
+    },
+    share: 'Share…',
+    new: 'New',
+    following: 'Following',
+    follow: 'Follow',
+    unfollow: 'Unfollow',
+    followed: 'Following “{name}”',
+    unfollowed: 'Stopped following “{name}”',
+    saveCopy: 'Save a copy',
+    copied: 'Saved a copy as “{name}”',
+    open: 'Open',
+    detach: 'Detach from source',
+    detachTitle: 'Detach “{name}” from its source?',
+    detachBody:
+      'You will be able to add and remove songs. Its songs stay as they are, but Downtify stops keeping it in step with Spotify or YouTube Music and removes its watch, if it has one.',
+    detached: '“{name}” can now be edited',
+    by: 'by {owner}',
+    sharedWithCount: {
+      one: 'Shared with {count} person',
+      other: 'Shared with {count} people',
+    },
+    sharedWithMe: 'Shared with me',
+    sharedWithMeHint:
+      'Playlists other people shared with you. You can play them, but not change them.',
+    publicPlaylists: 'Public playlists',
+    publicPlaylistsHint:
+      'Shared with everyone on this server. Follow one to keep it in your sidebar.',
+    navTitle: 'Shared with you',
+    showMore: 'Show {count} more',
+  },
   settings: {
     apps: 'Apps',
     title: 'Settings',
@@ -752,6 +895,13 @@ export default {
     showLyricsHint:
       'Turn off to hide the lyrics panel, its button and its shortcut. Your files keep their lyrics, and downloads still fetch them.',
     searchGroup: 'Search',
+    playlistsGroup: 'Playlists',
+    showPublicPlaylists: 'Show public playlists',
+    showPublicPlaylistsHint:
+      'List other people’s public playlists in the Library. Playlists you follow always show.',
+    allowPlaylistSharing: 'Allow users to share playlists',
+    allowPlaylistSharingHint:
+      'Users can share their playlists with other users, or make them public. When off, every shared playlist stays hidden until you turn it back on.',
     searchAlbums: 'Show albums in search results',
     searchAlbumsHint:
       'Also look up albums when searching, with an option to download the whole thing.',
@@ -769,6 +919,16 @@ export default {
     sourceYtmHint: 'Best metadata matches',
     sourceYt: 'YouTube',
     sourceYtHint: 'Fallback for songs missing from YouTube Music',
+    deemixTitle: 'Deemix',
+    deemixHint:
+      'Download from your own Deemix server. Requested quality requires the matching Deezer entitlement.',
+    deemixEnabled: 'Use Deemix',
+    deemixInPlace:
+      'Keep audio, artwork and lyrics in the shared Deemix folder, without rewriting its tags. Configure a private ARL file on the server; do not paste it here.',
+    deemixUrl: 'Deemix server URL',
+    deemixRemote: 'Download folder inside Deemix',
+    deemixLocal: 'Same folder inside Downtify (read-only is supported)',
+    deemixQuality: 'Audio quality',
     slskdTitle: 'slskd',
     slskdHint:
       'Download from Soulseek through your slskd server. Tracks it can’t find fall through to the next source.',
@@ -874,6 +1034,9 @@ export default {
     navidromeAdminHint:
       'Optional — lets Downtify start a library scan so new songs show up sooner.',
     test: {
+      connection_not_deemix: 'The server is not a compatible Deemix instance.',
+      quality_unavailable:
+        'The Deezer account cannot stream the requested quality.',
       button: 'Test connection',
       testing: 'Testing…',
       needFields: 'Fill in the fields above first.',
@@ -913,6 +1076,9 @@ export default {
     navidromeSyncHint:
       'After playlist downloads and monitor checks, keep a Navidrome playlist with the same name.',
     navidromePublic: 'Make Navidrome playlists public',
+    primaryLibrary: 'Primary library folder',
+    primaryLibraryHint:
+      'Prefer this folder for matching artist, song and album. Files and saved playlist paths are preserved; nothing is deleted.',
     libraryGroup: 'Library',
     coverCache: 'Cache cover art',
     coverCacheHint:
@@ -1017,6 +1183,7 @@ export default {
     lyrics: 'Lyrics',
     queue: 'Up next',
     search: 'Search',
+    findInPlaylist: 'Search the playlist (on its page)',
     goLibrary: 'Go to library',
     goQueue: 'Go to queue',
     close: 'Close now playing',
@@ -1156,6 +1323,32 @@ export default {
     later: 'Later',
     changePassword: 'Change password',
   },
+  visibility: {
+    hide: 'Hide from users',
+    show: 'Show to users',
+    hiddenShort: 'Hidden',
+    hidden: {
+      one: 'Hidden from users',
+      other: '{count} items hidden from users',
+    },
+    shown: {
+      one: 'Shown to users',
+      other: '{count} items shown to users',
+    },
+    hiddenBy: {
+      track: 'Hidden from users',
+      album: 'Hidden from users with its album',
+      artist: 'Hidden from users with its artist',
+    },
+    title: 'Hidden from users',
+    hint: 'Everyone sees every song that was downloaded. What you hide here is left out of what users see; admins still see everything. Hide songs, albums or artists from the Library.',
+    none: 'Nothing is hidden. Use “Hide from users” on a song, album or artist in the Library.',
+    group: {
+      artists: 'Artists',
+      albums: 'Albums',
+      tracks: 'Songs',
+    },
+  },
   users: {
     title: 'Users',
     hint: 'Who can sign in to this server. Admins can change everything; users can listen, search, download and change their own account.',
@@ -1222,6 +1415,8 @@ export default {
       unlike: 'Unlikes',
       delete: 'Deleted files',
       audio_replaced: 'Audio replaced',
+      library_hidden: 'Items hidden from users',
+      library_shown: 'Items shown to users',
       device_paired: 'Apps paired',
       device_unpaired: 'Apps unpaired',
       user_created: 'Users added',
@@ -1240,6 +1435,8 @@ export default {
       unlike: 'unliked {what}',
       delete: 'deleted {what}',
       audio_replaced: 'replaced the audio of {what}',
+      library_hidden: 'hid {what} from users',
+      library_shown: 'showed {what} to users',
       device_paired: 'paired {what}',
       device_unpaired: 'unpaired {what}',
       user_created: 'added the user {what}',
@@ -1377,6 +1574,11 @@ export default {
       other: '{count} tracks added to queue',
     },
     deleted: { one: 'Track deleted', other: '{count} tracks deleted' },
+    releasedShared: {
+      one: '{count} song stays in the shared library (someone else downloaded it too)',
+      other:
+        '{count} songs stay in the shared library (someone else downloaded them too)',
+    },
     deletePartial: {
       one: "{count} file couldn't be deleted",
       other: "{count} files couldn't be deleted",

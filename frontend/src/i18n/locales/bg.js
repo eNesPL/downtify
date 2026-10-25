@@ -2,8 +2,51 @@ import recognition from '../recognition.js'
 
 export default {
   recognition,
+  playlistNames: { restore: 'Restore source name' },
+  playlistFavorites: {
+    title: 'Любими плейлисти',
+    add: 'Добавяне на плейлиста в любими',
+    remove: 'Премахване на плейлиста от любими',
+  },
+  externalPlaylistImport: {
+    open: 'Import folder playlists',
+    title: 'Playlists in your music folders',
+    hint: 'Select the playlists to add, up to 50 at a time. Only available tracks are referenced. Source files and audio are never changed.',
+    loading: 'Looking for playlist files…',
+    empty: 'No M3U or M3U8 playlist files found in the added folders.',
+    counts:
+      '{count} available · {missing} unavailable · {duplicates} repeated entries',
+    existing: 'Already added as {name}',
+    preview: 'Preview the first 30 tracks',
+    truncated: 'The scan reached its limit; this list is incomplete.',
+    add: 'Add selected playlists ({count})',
+    result:
+      '{added} added · {existing} already present · {failed} need a new preview or could not be imported',
+  },
   language: {
     name: 'Български',
+  },
+  buy: {
+    menu: 'Подкрепете артиста',
+    title: 'Подкрепете артиста',
+    body: 'Купете музиката или посетете собствения сайт на артиста.',
+    inStore: 'Отвори в магазина',
+    search: 'Търси „{query}“',
+    website: 'Официален сайт',
+    failed: 'Магазините не можаха да бъдат проверени.',
+    note: 'Bandcamp дава по-голямата част от всяка продажба на артиста. Това са обикновени връзки: Downtify не продава нищо и не печели от тях.',
+  },
+  playlistSearch: {
+    placeholder: 'Търсене в този плейлист',
+    all: 'Всички',
+    missing: 'Липсващи',
+    failed: 'Неуспешни',
+    notInNavidrome: 'Липсват в Navidrome',
+    fromFolders: 'Вашите папки',
+    unknownSource: 'Неизвестен източник',
+    showing: '{count} от {total}',
+    noMatch: 'Няма съвпадения',
+    noMatchHint: 'Опитайте с други думи или друг филтър.',
   },
   common: {
     cancel: 'Отказ',
@@ -17,6 +60,7 @@ export default {
     seeAll: 'Виж всички',
     show: 'Покажи',
     hide: 'Скрий',
+    undo: 'Отмяна',
     unknownArtist: 'Неизвестен изпълнител',
     tracks: { one: '{count} песен', other: '{count} песни' },
     albums: { one: '{count} албум', other: '{count} албума' },
@@ -218,6 +262,11 @@ export default {
     downloadNew: { one: 'Изтегли {count} нова', other: 'Изтегли {count} нови' },
     redownloadAll: 'Изтегли всички отново',
     downloadSelected: 'Изтегли избраните',
+    allHandled: 'Вече е в библиотеката или опашката',
+    addPlaylist: 'Добавяне към моите плейлисти',
+    noAvailableTracks: 'Все още няма изтеглени песни за добавяне.',
+    saveAvailableHint:
+      'Налични са {count} от {total} песни. Използват се съществуващите аудиофайлове; липсващите песни няма да бъдат изтеглени.',
     allInLibrary: 'Всичко е в библиотеката ти',
     watchPlaylist: 'Следи за нови песни',
     watchArtist: 'Следи за нови издания',
@@ -298,6 +347,19 @@ export default {
     sortArtist: 'Изпълнител',
     sortYear: 'Година',
     sortTrackCount: 'Брой песни',
+    trackSort: {
+      order: 'Ред на плейлиста',
+      addedNew: 'Наскоро добавени',
+      addedOld: 'Добавени отдавна',
+      titleAsc: 'Заглавие (А–Я)',
+      titleDesc: 'Заглавие (Я–А)',
+      artistAsc: 'Изпълнител (А–Я)',
+      artistDesc: 'Изпълнител (Я–А)',
+      albumAsc: 'Албум (А–Я)',
+      albumDesc: 'Албум (Я–А)',
+      longest: 'Първо най-дългите',
+      shortest: 'Първо най-късите',
+    },
     viewGrid: 'Мрежа',
     viewList: 'Списък',
     emptyTitle: 'Библиотеката ти е празна',
@@ -336,6 +398,28 @@ export default {
     failed: 'Харесването не можа да се обнови',
   },
   upgrade: {
+    chooseRecording: 'Choose a Deezer recording',
+    chooseRecordingHint:
+      'Review an exact recording when old album tags do not match. The artist and full title must still match.',
+    recordingLink: 'Deezer track link',
+    previewRecording: 'Preview',
+    recordingReviewHint:
+      'Review the album and duration. This prepares a single-track scan; replacement starts only after you confirm the scan.',
+    analyzeRecording: 'Analyze this choice',
+    recordingPreviewFailed: 'Unable to preview this Deezer track.',
+    replacementRescan: 'Options changed: scan again before starting.',
+    deemixTitle: 'Replace recordings with Deemix',
+    replaceAudio: 'Use verified Deemix recordings',
+    replaceAudioHint:
+      'Match the exact artist, title and album. Keep music in the Deemix folder. Ambiguous matches leave originals untouched. This scan replaces audio instead of retagging it.',
+    deleteOriginals: 'Remove old Downtify audio after import',
+    deleteOriginalsHint:
+      'Only remove each verified original after playlists, likes and playback references are updated. External files and sidecars are never removed.',
+    replacementProgress:
+      'Awaiting publication or cleanup: {pending}. Old copies removed: {removed}. Originals kept: {kept}.',
+    audio: 'Deemix recordings',
+    audioHint:
+      'Verify catalog duration and decoded audio before updating playlists and removing an old copy.',
     title: 'Подобри библиотеката',
     subtitle:
       'Подобрете музиката, която вече сте изтеглили, вместо да я теглите отново.',
@@ -530,6 +614,19 @@ export default {
     },
     alreadyIn: 'Вече е в „{name}“',
     removedTrack: 'Премахната от „{name}“',
+    hideTrack: 'Скрий от плейлиста',
+    hiddenTrack: 'Скрита от „{name}“',
+    hiddenTitle: {
+      one: '{count} скрита песен',
+      other: '{count} скрити песни',
+    },
+    hiddenHint:
+      'Песни, които сте скрили от този плейлист. Те остават извън него, когато се синхронизира с източника си, и остават в библиотеката ви.',
+    hiddenGone: 'Вече не е в библиотеката ви',
+    unhide: 'Покажи отново',
+    unhidden: 'Отново в „{name}“',
+    unhiddenLater:
+      'Тя ще се върне в „{name}“, когато плейлистът изтегли липсващото',
     created: 'Създаден „{name}“',
     rename: 'Преименувай',
     renameTitle: 'Преименувай плейлиста',
@@ -728,6 +825,52 @@ export default {
     saved: 'Наблюдението е обновено',
     retargeted: 'Вече се следи {name}',
   },
+  sharing: {
+    title: 'Споделяне на „{name}“',
+    hint: 'Хората, с които го споделиш, могат да го пускат, следват и да запазват копие, но не могат да го променят.',
+    private: 'Личен',
+    privateHint: 'Само ти можеш да го виждаш.',
+    shared: 'Избрани хора',
+    sharedHint: 'Избери кой може да го вижда.',
+    public: 'Публичен',
+    publicHint: 'Всички на този сървър могат да го виждат.',
+    noOtherUsers: 'Няма други акаунти, с които да споделиш.',
+    findUser: 'Намери човек',
+    loadingUsers: 'Зареждане на хората…',
+    saved: {
+      private: 'Плейлистът „{name}“ отново е личен',
+      shared: 'Плейлистът „{name}“ е споделен',
+      public: 'Плейлистът „{name}“ вече е публичен',
+    },
+    share: 'Сподели…',
+    new: 'Нов',
+    following: 'Следва се',
+    follow: 'Следвай',
+    unfollow: 'Спри следването',
+    followed: 'Следваш „{name}“',
+    unfollowed: 'Спря да следваш „{name}“',
+    saveCopy: 'Запази копие',
+    copied: 'Копието е запазено като „{name}“',
+    open: 'Отвори',
+    detach: 'Откачи от източника',
+    detachTitle: 'Да се откачи ли „{name}“ от източника?',
+    detachBody:
+      'Ще можеш да добавяш и премахваш песни. Песните остават както са, но Downtify спира да поддържа плейлиста синхронизиран със Spotify или YouTube Music и премахва следенето му, ако има такова.',
+    detached: '„{name}“ вече може да се редактира',
+    by: 'от {owner}',
+    sharedWithCount: {
+      one: 'Споделен с {count} човек',
+      other: 'Споделен с {count} души',
+    },
+    sharedWithMe: 'Споделени с мен',
+    sharedWithMeHint:
+      'Плейлисти, които други са споделили с теб. Можеш да ги пускаш, но не и да ги променяш.',
+    publicPlaylists: 'Публични плейлисти',
+    publicPlaylistsHint:
+      'Споделени с всички на този сървър. Следвай някой, за да остане в страничната лента.',
+    navTitle: 'Споделени с теб',
+    showMore: 'Покажи още {count}',
+  },
   settings: {
     apps: 'Приложения',
     title: 'Настройки',
@@ -761,6 +904,13 @@ export default {
     showLyricsHint:
       'Изключете, за да се скрият панелът с текстове, бутонът му и клавишната му комбинация. Файловете запазват текстовете си, а изтеглянията продължават да ги търсят.',
     searchGroup: 'Търсене',
+    playlistsGroup: 'Плейлисти',
+    showPublicPlaylists: 'Показвай публичните плейлисти',
+    showPublicPlaylistsHint:
+      'Показва публичните плейлисти на други хора в Библиотеката. Тези, които следваш, винаги се виждат.',
+    allowPlaylistSharing: 'Позволи на потребителите да споделят плейлисти',
+    allowPlaylistSharingHint:
+      'Потребителите могат да споделят плейлистите си с други или да ги направят публични. Когато е изключено, всички споделени плейлисти остават скрити, докато не го включиш отново.',
     searchAlbums: 'Показвай албуми в резултатите',
     searchAlbumsHint:
       'Търси и албуми, с възможност за изтегляне на целия албум.',
@@ -778,6 +928,16 @@ export default {
     sourceYtmHint: 'Най-добри съвпадения на метаданни',
     sourceYt: 'YouTube',
     sourceYtHint: 'Резерва за песни, които липсват в YouTube Music',
+    deemixTitle: 'Deemix',
+    deemixHint:
+      'Download from your own Deemix server. Requested quality requires the matching Deezer entitlement.',
+    deemixEnabled: 'Use Deemix',
+    deemixInPlace:
+      'Keep audio, artwork and lyrics in the shared Deemix folder, without rewriting its tags. Configure a private ARL file on the server; do not paste it here.',
+    deemixUrl: 'Deemix server URL',
+    deemixRemote: 'Download folder inside Deemix',
+    deemixLocal: 'Same folder inside Downtify (read-only is supported)',
+    deemixQuality: 'Audio quality',
     slskdTitle: 'slskd',
     slskdHint:
       'Изтегляй от Soulseek чрез своя slskd сървър. Ненамерените песни минават към следващия източник.',
@@ -885,6 +1045,10 @@ export default {
     navidromeAdminHint:
       'По избор — позволява на Downtify да стартира сканиране, за да се появяват новите песни по-бързо.',
     test: {
+      connection_not_deemix: 'The server is not a compatible Deemix instance.',
+      quality_unavailable:
+        'The Deezer account cannot stream the requested quality.',
+
       button: 'Провери връзката',
       testing: 'Проверка…',
       needFields: 'Първо попълнете полетата по-горе.',
@@ -927,6 +1091,9 @@ export default {
     navidromeSyncHint:
       'След изтегляния на плейлисти и проверки поддържа плейлист със същото име в Navidrome.',
     navidromePublic: 'Направи плейлистите в Navidrome публични',
+    primaryLibrary: 'Primary library folder',
+    primaryLibraryHint:
+      'Prefer this folder for matching artist, song and album. Files and saved playlist paths are preserved; nothing is deleted.',
     libraryGroup: 'Библиотека',
     coverCache: 'Кеш за обложки',
     coverCacheHint:
@@ -1032,6 +1199,7 @@ export default {
     lyrics: 'Текст',
     queue: 'Следват',
     search: 'Търсене',
+    findInPlaylist: 'Търсене в плейлиста (на страницата му)',
     goLibrary: 'Към библиотеката',
     goQueue: 'Към опашката',
     close: 'Затвори „Сега звучи“',
@@ -1177,6 +1345,32 @@ export default {
     later: 'По-късно',
     changePassword: 'Смяна на паролата',
   },
+  visibility: {
+    hide: 'Скриване от потребителите',
+    show: 'Показване на потребителите',
+    hiddenShort: 'Скрито',
+    hidden: {
+      one: 'Скрито от потребителите',
+      other: '{count} елемента са скрити от потребителите',
+    },
+    shown: {
+      one: 'Показано на потребителите',
+      other: '{count} елемента са показани на потребителите',
+    },
+    hiddenBy: {
+      track: 'Скрита от потребителите',
+      album: 'Скрита от потребителите заедно с албума',
+      artist: 'Скрита от потребителите заедно с изпълнителя',
+    },
+    title: 'Скрито от потребителите',
+    hint: 'Всички виждат всички изтеглени песни. Каквото скриете тук, потребителите не го виждат; администраторите продължават да виждат всичко. Скривайте песни, албуми или изпълнители от Библиотеката.',
+    none: 'Нищо не е скрито. Използвайте „Скриване от потребителите“ върху песен, албум или изпълнител в Библиотеката.',
+    group: {
+      artists: 'Изпълнители',
+      albums: 'Албуми',
+      tracks: 'Песни',
+    },
+  },
   users: {
     title: 'Потребители',
     hint: 'Кой може да влиза в този сървър. Администраторите могат да променят всичко; потребителите слушат, търсят, изтеглят и променят собствения си акаунт.',
@@ -1244,6 +1438,8 @@ export default {
       unlike: 'Премахнати харесвания',
       delete: 'Изтрити файлове',
       audio_replaced: 'Заменени аудиа',
+      library_hidden: 'Елементи, скрити от потребителите',
+      library_shown: 'Елементи, показани на потребителите',
       device_paired: 'Сдвоени приложения',
       device_unpaired: 'Разкачени приложения',
       user_created: 'Добавени потребители',
@@ -1262,6 +1458,8 @@ export default {
       unlike: 'премахна харесването на {what}',
       delete: 'изтри {what}',
       audio_replaced: 'замени аудиото на {what}',
+      library_hidden: 'скри {what} от потребителите',
+      library_shown: 'показа {what} на потребителите',
       device_paired: 'сдвои {what}',
       device_unpaired: 'разкачи {what}',
       user_created: 'добави потребителя {what}',
@@ -1402,6 +1600,11 @@ export default {
       other: '{count} песни са добавени към опашката',
     },
     deleted: { one: 'Песента е изтрита', other: '{count} песни са изтрити' },
+    releasedShared: {
+      one: '{count} песен остава в общата библиотека (изтеглена е и от някой друг)',
+      other:
+        '{count} песни остават в общата библиотека (изтеглени са и от някой друг)',
+    },
     deletePartial: {
       one: '{count} файл не можа да бъде изтрит',
       other: '{count} файла не можаха да бъдат изтрити',

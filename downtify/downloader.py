@@ -36,7 +36,13 @@ from yt_dlp.postprocessor.ffmpeg import FFmpegExtractAudioPP
 
 from . import lyrics as lyrics_mod
 from . import spotify as spotify_mod
+from .content_advisory import (
+    ADVISORY_EXPLICIT,
+    ADVISORY_TAG,
+    MP4_ADVISORY_ATOM,
+)
 from .cookies import CookiesStore
+from .deemix_provider import download_from_deemix, normalize_settings
 from .file_naming import sanitize_file_name
 from .itunes import fetch_genre as _fetch_itunes_genre
 from .library_paths import library_stored_path, slskd_dir_from_downloader
@@ -59,7 +65,7 @@ _AUDIO_EXTENSIONS = frozenset({'mp3', 'flac', 'ogg', 'opus', 'm4a'})
 # shown next to each queue row.
 ProgressCallback = Callable[[float, str, Optional[str]], None]
 
-AUDIO_PROVIDERS = ('youtube-music', 'youtube', 'slskd')
+AUDIO_PROVIDERS = ('youtube-music', 'youtube', 'slskd', 'deemix')
 
 
 class NoAudioMatchError(RuntimeError):
@@ -344,6 +350,8 @@ class Downloader:
 
     #: Called as ``on_downloaded(song, filename)`` once a *new* file has been
     #: downloaded and tagged - not for a song that was already in the library.
+    #: ``song['download_provider']`` says which audio provider fetched it
+    #: (``youtube-music``, ``youtube``, ``slskd``, ``deemix``).
     #: Set by the app (``main.py``) to hook work on to a finished download
     #: (see ``api.enrich_artist_after_download``); it runs on the download's
     #: own thread, so it must only hand the work off and return. Whatever it
@@ -367,9 +375,11 @@ class Downloader:
         audio_providers: Optional[list[str]] = None,
         slskd_settings: Optional[dict[str, Any]] = None,
         max_track_duration_seconds: int = MAX_TRACK_DURATION_SECONDS,
+        deemix_settings: Optional[dict[str, Any]] = None,
     ):
         self.download_dir = Path(download_dir)
         self.download_dir.mkdir(parents=True, exist_ok=True)
+        self.deemix_settings = normalize_settings(deemix_settings)
         self.audio_providers = self._normalize_audio_providers(audio_providers)
         self.slskd_settings = self._normalize_slskd_settings(slskd_settings)
         # slskd copies a finished transfer here when it isn't left in place.
@@ -483,7 +493,16 @@ class Downloader:
 
         youtube_searched = False
         for provider in self.audio_providers:
-            if provider == 'slskd':
+            if provider == 'deemix':
+                if not self.deemix_settings.get('enabled'):
+                    continue
+                local = download_from_deemix(
+                    song, self.deemix_settings, progress_cb=progress_cb
+                )
+                if local is not None:
+                    return None, None, 'deemix', local
+                _report(progress_cb, 0.0, 'Trying next source', 'deemix')
+            elif provider == 'slskd':
                 if not self.slskd_settings.get('enabled'):
                     continue
                 local = download_from_slskd(
@@ -656,16 +675,7 @@ class Downloader:
         ``download_dir`` (``<subdir>/<file>.<ext>``).
         """
 
-        output_parts = self._format_output_parts(song)
-        basename = output_parts[-1]
-        output_subdir = (
-            Path(*output_parts[:-1]) if len(output_parts) > 1 else None
-        )
-        effective_subdir = self._effective_subdir(song, subdir)
-        target_dir, prefix = self._resolve_target_dir(effective_subdir)
-        if output_subdir is not None:
-            target_dir /= output_subdir
-            prefix = f'{prefix}{output_subdir.as_posix()}/'
+        target_dir, prefix, basename = self._expected_location(song, subdir)
         primary = target_dir / f'{basename}.{self.audio_format}'
         if primary.exists():
             return f'{prefix}{primary.name}'
@@ -681,6 +691,34 @@ class Downloader:
                 ):
                     return f'{prefix}{candidate.name}'
         return None
+
+    def _expected_location(
+        self, song: dict[str, Any], subdir: Optional[str]
+    ) -> tuple[Path, str, str]:
+        """``(target_dir, relative_prefix, basename)`` a download of
+        ``song`` lands at - no disk access."""
+
+        output_parts = self._format_output_parts(song)
+        basename = output_parts[-1]
+        output_subdir = (
+            Path(*output_parts[:-1]) if len(output_parts) > 1 else None
+        )
+        effective_subdir = self._effective_subdir(song, subdir)
+        target_dir, prefix = self._resolve_target_dir(effective_subdir)
+        if output_subdir is not None:
+            target_dir /= output_subdir
+            prefix = f'{prefix}{output_subdir.as_posix()}/'
+        return target_dir, prefix, basename
+
+    def expected_stem_for(
+        self, song: dict[str, Any], subdir: Optional[str] = None
+    ) -> str:
+        """The library path :meth:`existing_filename_for` looks for,
+        without the extension (``<subdir>/<file>``) - no disk access, so
+        many songs can be checked against an in-memory listing."""
+
+        _target_dir, prefix, basename = self._expected_location(song, subdir)
+        return f'{prefix}{basename}'
 
     def find_existing_download(
         self,
@@ -860,6 +898,7 @@ class Downloader:
                 self._finalize_local_source(
                     song, local_source, provider, progress_cb, subdir
                 ),
+                provider,
             )
 
         if not skip_existing:
@@ -868,6 +907,7 @@ class Downloader:
                 self._fetch_and_tag(
                     song, video_id, progress_cb, subdir, provider
                 ),
+                provider,
             )
 
         # Re-checked after enrichment (which can fill in the album/track
@@ -884,16 +924,23 @@ class Downloader:
                 self._fetch_and_tag(
                     song, video_id, progress_cb, subdir, provider
                 ),
+                provider,
             )
 
-    def _downloaded(self, song: dict[str, Any], filename: str) -> str:
-        """Tell :attr:`on_downloaded` that *filename* is new; returns it.
-        A hook that fails is logged and ignored: the file is already there."""
+    def _downloaded(
+        self,
+        song: dict[str, Any],
+        filename: str,
+        provider: Optional[str] = None,
+    ) -> str:
+        """Tell :attr:`on_downloaded` that *filename* is new (and which
+        *provider* fetched it); returns it. A hook that fails is logged and
+        ignored: the file is already there."""
 
         hook = self.on_downloaded
         if hook is not None:
             try:
-                hook(song, filename)
+                hook({**song, 'download_provider': provider or ''}, filename)
             except Exception:
                 logger.opt(exception=True).warning(
                     'The after-download hook failed for {}', filename
@@ -977,6 +1024,16 @@ class Downloader:
         destination a YouTube download would use, keeping its original
         format — slskd files are not transcoded.
         """
+
+        if provider == 'deemix':
+            stored = library_stored_path(
+                source_path,
+                self.download_dir,
+                slskd_dir_from_downloader(self),
+                [Path(self.deemix_settings['source_dir'])],
+            )
+            _report(progress_cb, 100.0, 'Done', provider)
+            return stored
 
         lookups = _MetadataLookups(self, song)
         try:
@@ -1426,6 +1483,8 @@ def embed_metadata(
     recording_date = _recording_date_for_tags(song)
     genre = (song.get('genre') or '').strip()
     release_type = _release_type_for_tags(song)
+    # Only ever added: a file is never un-flagged by a song that doesn't say.
+    explicit = bool(song.get('explicit'))
     if not download_cover:
         cover_bytes = None
     elif cover_bytes is None:
@@ -1474,6 +1533,7 @@ def embed_metadata(
             track_number,
             album_track_total,
             release_type,
+            explicit,
         )
     elif suffix in {'m4a', 'mp4', 'aac'}:
         _tag_mp4(
@@ -1488,6 +1548,7 @@ def embed_metadata(
             track_number,
             album_track_total,
             release_type,
+            explicit,
         )
     elif suffix == 'flac':
         _tag_flac(
@@ -1502,6 +1563,7 @@ def embed_metadata(
             track_number,
             album_track_total,
             release_type,
+            explicit,
         )
     elif suffix in {'ogg', 'oga'}:
         _tag_ogg_vorbis(
@@ -1516,6 +1578,7 @@ def embed_metadata(
             track_number,
             album_track_total,
             release_type,
+            explicit,
         )
     elif suffix == 'opus':
         _tag_opus(
@@ -1530,6 +1593,7 @@ def embed_metadata(
             track_number,
             album_track_total,
             release_type,
+            explicit,
         )
 
 
@@ -1545,6 +1609,7 @@ def _tag_mp3(
     track_number: Optional[int],
     album_track_total: Optional[int],
     release_type: str = '',
+    explicit: bool = False,
 ) -> None:
     audio = MP3(str(path), ID3=ID3)
     if audio.tags is None:
@@ -1584,6 +1649,11 @@ def _tag_mp3(
                 text=release_type,
             )
         )
+    if explicit:
+        audio.tags.delall(f'TXXX:{ADVISORY_TAG}')
+        audio.tags.add(
+            TXXX(encoding=3, desc=ADVISORY_TAG, text=ADVISORY_EXPLICIT)
+        )
     if cover_bytes:
         audio.tags.add(
             APIC(
@@ -1617,6 +1687,7 @@ def _tag_mp4(
     track_number: Optional[int],
     album_track_total: Optional[int],
     release_type: str = '',
+    explicit: bool = False,
 ) -> None:
     audio = MP4(str(path))
     audio['\xa9nam'] = title
@@ -1639,6 +1710,8 @@ def _tag_mp4(
         audio['----:com.apple.iTunes:MusicBrainz Album Type'] = [
             MP4FreeForm(release_type.encode('utf-8'))
         ]
+    if explicit:
+        audio[MP4_ADVISORY_ATOM] = [int(ADVISORY_EXPLICIT)]
     if cover_bytes:
         audio['covr'] = [
             MP4Cover(cover_bytes, imageformat=MP4Cover.FORMAT_JPEG)
@@ -1658,6 +1731,7 @@ def _tag_flac(
     track_number: Optional[int],
     album_track_total: Optional[int],
     release_type: str = '',
+    explicit: bool = False,
 ) -> None:
     audio = FLAC(str(path))
     audio['title'] = title
@@ -1679,6 +1753,8 @@ def _tag_flac(
         audio['genre'] = genre
     if release_type:
         audio['releasetype'] = release_type
+    if explicit:
+        audio[ADVISORY_TAG] = ADVISORY_EXPLICIT
     if cover_bytes:
         picture = Picture()
         picture.data = cover_bytes
@@ -1701,6 +1777,7 @@ def _tag_ogg_vorbis(
     track_number: Optional[int],
     album_track_total: Optional[int],
     release_type: str = '',
+    explicit: bool = False,
 ) -> None:
     audio = OggVorbis(str(path))
     _apply_vorbis_comments(
@@ -1715,6 +1792,7 @@ def _tag_ogg_vorbis(
         track_number,
         album_track_total,
         release_type,
+        explicit,
     )
     audio.save()
 
@@ -1731,6 +1809,7 @@ def _tag_opus(
     track_number: Optional[int],
     album_track_total: Optional[int],
     release_type: str = '',
+    explicit: bool = False,
 ) -> None:
     audio = OggOpus(str(path))
     _apply_vorbis_comments(
@@ -1745,6 +1824,7 @@ def _tag_opus(
         track_number,
         album_track_total,
         release_type,
+        explicit,
     )
     audio.save()
 
@@ -1761,6 +1841,7 @@ def _apply_vorbis_comments(
     track_number: Optional[int],
     album_track_total: Optional[int],
     release_type: str = '',
+    explicit: bool = False,
 ):
     audio['title'] = title
     if artists:
@@ -1779,6 +1860,8 @@ def _apply_vorbis_comments(
         audio['date'] = year
     if release_type:
         audio['RELEASETYPE'] = release_type
+    if explicit:
+        audio[ADVISORY_TAG] = ADVISORY_EXPLICIT
     if genre:
         audio['genre'] = genre
     if cover_bytes:

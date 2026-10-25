@@ -2,8 +2,51 @@ import recognition from '../recognition.js'
 
 export default {
   recognition,
+  playlistNames: { restore: 'Restore source name' },
+  playlistFavorites: {
+    title: 'Αγαπημένες λίστες',
+    add: 'Προσθήκη λίστας στα αγαπημένα',
+    remove: 'Αφαίρεση λίστας από τα αγαπημένα',
+  },
+  externalPlaylistImport: {
+    open: 'Import folder playlists',
+    title: 'Playlists in your music folders',
+    hint: 'Select the playlists to add, up to 50 at a time. Only available tracks are referenced. Source files and audio are never changed.',
+    loading: 'Looking for playlist files…',
+    empty: 'No M3U or M3U8 playlist files found in the added folders.',
+    counts:
+      '{count} available · {missing} unavailable · {duplicates} repeated entries',
+    existing: 'Already added as {name}',
+    preview: 'Preview the first 30 tracks',
+    truncated: 'The scan reached its limit; this list is incomplete.',
+    add: 'Add selected playlists ({count})',
+    result:
+      '{added} added · {existing} already present · {failed} need a new preview or could not be imported',
+  },
   language: {
     name: 'Ελληνικά',
+  },
+  buy: {
+    menu: 'Στηρίξτε τον καλλιτέχνη',
+    title: 'Στηρίξτε τον καλλιτέχνη',
+    body: 'Αγοράστε τη μουσική ή επισκεφθείτε τον ιστότοπο του ίδιου του καλλιτέχνη.',
+    inStore: 'Άνοιγμα στο κατάστημα',
+    search: 'Αναζήτηση «{query}»',
+    website: 'Επίσημος ιστότοπος',
+    failed: 'Δεν ήταν δυνατή η αναζήτηση στα καταστήματα.',
+    note: 'Το Bandcamp δίνει στον καλλιτέχνη το μεγαλύτερο μέρος κάθε πώλησης. Είναι απλοί σύνδεσμοι: το Downtify δεν πουλά τίποτα και δεν κερδίζει από αυτούς.',
+  },
+  playlistSearch: {
+    placeholder: 'Αναζήτηση σε αυτή τη λίστα',
+    all: 'Όλα',
+    missing: 'Λείπουν',
+    failed: 'Απέτυχαν',
+    notInNavidrome: 'Εκτός Navidrome',
+    fromFolders: 'Οι φάκελοί σας',
+    unknownSource: 'Άγνωστη πηγή',
+    showing: '{count} από {total}',
+    noMatch: 'Δεν βρέθηκε τίποτα',
+    noMatchHint: 'Δοκιμάστε άλλες λέξεις ή άλλο φίλτρο.',
   },
   common: {
     cancel: 'Ακύρωση',
@@ -17,6 +60,7 @@ export default {
     seeAll: 'Όλα',
     show: 'Εμφάνιση',
     hide: 'Απόκρυψη',
+    undo: 'Αναίρεση',
     unknownArtist: 'Άγνωστος καλλιτέχνης',
     tracks: { one: '{count} κομμάτι', other: '{count} κομμάτια' },
     albums: { one: '{count} άλμπουμ', other: '{count} άλμπουμ' },
@@ -225,6 +269,11 @@ export default {
     downloadNew: { one: 'Λήψη {count} νέου', other: 'Λήψη {count} νέων' },
     redownloadAll: 'Λήψη όλων ξανά',
     downloadSelected: 'Λήψη επιλεγμένων',
+    allHandled: 'Ήδη στη βιβλιοθήκη ή στην ουρά',
+    addPlaylist: 'Προσθήκη στις λίστες μου',
+    noAvailableTracks: 'Δεν υπάρχουν ακόμη διαθέσιμα κατεβασμένα κομμάτια.',
+    saveAvailableHint:
+      'Διαθέσιμα {count} από {total} κομμάτια. Χρησιμοποιούνται τα υπάρχοντα αρχεία ήχου· τα κομμάτια που λείπουν δεν θα ληφθούν.',
     allInLibrary: 'Όλα είναι στη βιβλιοθήκη σου',
     watchPlaylist: 'Παρακολούθηση νέων κομματιών',
     watchArtist: 'Παρακολούθηση νέων κυκλοφοριών',
@@ -306,6 +355,19 @@ export default {
     sortArtist: 'Καλλιτέχνης',
     sortYear: 'Έτος',
     sortTrackCount: 'Αριθμός κομματιών',
+    trackSort: {
+      order: 'Σειρά λίστας',
+      addedNew: 'Πρόσφατα προστεθέντα',
+      addedOld: 'Παλαιότερα προστεθέντα',
+      titleAsc: 'Τίτλος (Α–Ω)',
+      titleDesc: 'Τίτλος (Ω–Α)',
+      artistAsc: 'Καλλιτέχνης (Α–Ω)',
+      artistDesc: 'Καλλιτέχνης (Ω–Α)',
+      albumAsc: 'Άλμπουμ (Α–Ω)',
+      albumDesc: 'Άλμπουμ (Ω–Α)',
+      longest: 'Πρώτα τα μεγαλύτερα',
+      shortest: 'Πρώτα τα μικρότερα',
+    },
     viewGrid: 'Πλέγμα',
     viewList: 'Λίστα',
     emptyTitle: 'Η βιβλιοθήκη σου είναι άδεια',
@@ -344,6 +406,28 @@ export default {
     failed: 'Δεν ήταν δυνατή η ενημέρωση',
   },
   upgrade: {
+    chooseRecording: 'Choose a Deezer recording',
+    chooseRecordingHint:
+      'Review an exact recording when old album tags do not match. The artist and full title must still match.',
+    recordingLink: 'Deezer track link',
+    previewRecording: 'Preview',
+    recordingReviewHint:
+      'Review the album and duration. This prepares a single-track scan; replacement starts only after you confirm the scan.',
+    analyzeRecording: 'Analyze this choice',
+    recordingPreviewFailed: 'Unable to preview this Deezer track.',
+    replacementRescan: 'Options changed: scan again before starting.',
+    deemixTitle: 'Replace recordings with Deemix',
+    replaceAudio: 'Use verified Deemix recordings',
+    replaceAudioHint:
+      'Match the exact artist, title and album. Keep music in the Deemix folder. Ambiguous matches leave originals untouched. This scan replaces audio instead of retagging it.',
+    deleteOriginals: 'Remove old Downtify audio after import',
+    deleteOriginalsHint:
+      'Only remove each verified original after playlists, likes and playback references are updated. External files and sidecars are never removed.',
+    replacementProgress:
+      'Awaiting publication or cleanup: {pending}. Old copies removed: {removed}. Originals kept: {kept}.',
+    audio: 'Deemix recordings',
+    audioHint:
+      'Verify catalog duration and decoded audio before updating playlists and removing an old copy.',
     title: 'Αναβάθμιση βιβλιοθήκης',
     subtitle:
       'Βελτιώστε τη μουσική που έχετε ήδη κατεβάσει, αντί να την κατεβάσετε ξανά.',
@@ -537,6 +621,19 @@ export default {
     },
     alreadyIn: 'Ήδη στο «{name}»',
     removedTrack: 'Αφαιρέθηκε από τη «{name}»',
+    hideTrack: 'Απόκρυψη από τη λίστα',
+    hiddenTrack: 'Κρύφτηκε από τη «{name}»',
+    hiddenTitle: {
+      one: '{count} κρυμμένο τραγούδι',
+      other: '{count} κρυμμένα τραγούδια',
+    },
+    hiddenHint:
+      'Τραγούδια που κρύψατε από αυτή τη λίστα. Μένουν εκτός όταν συγχρονίζεται με την πηγή της και μένουν στη βιβλιοθήκη σας.',
+    hiddenGone: 'Δεν είναι πια στη βιβλιοθήκη σας',
+    unhide: 'Εμφάνιση ξανά',
+    unhidden: 'Ξανά στη «{name}»',
+    unhiddenLater:
+      'Επιστρέφει στη «{name}» όταν η λίστα κατεβάσει ό,τι της λείπει',
     created: 'Δημιουργήθηκε η «{name}»',
     rename: 'Μετονομασία',
     renameTitle: 'Μετονομασία λίστας',
@@ -738,6 +835,52 @@ export default {
     saved: 'Η παρακολούθηση ενημερώθηκε',
     retargeted: 'Παρακολούθηση του {name}',
   },
+  sharing: {
+    title: 'Κοινοποίηση «{name}»',
+    hint: 'Όσοι τη λάβουν μπορούν να την παίξουν, να την ακολουθήσουν και να αποθηκεύσουν αντίγραφο, αλλά όχι να την αλλάξουν.',
+    private: 'Ιδιωτική',
+    privateHint: 'Μόνο εσύ μπορείς να τη δεις.',
+    shared: 'Συγκεκριμένα άτομα',
+    sharedHint: 'Διάλεξε ποιοι μπορούν να τη δουν.',
+    public: 'Δημόσια',
+    publicHint: 'Όλοι σε αυτόν τον διακομιστή μπορούν να τη δουν.',
+    noOtherUsers: 'Δεν υπάρχουν άλλοι λογαριασμοί για κοινοποίηση.',
+    findUser: 'Αναζήτηση ατόμου',
+    loadingUsers: 'Φόρτωση ατόμων…',
+    saved: {
+      private: 'Η «{name}» είναι πάλι ιδιωτική',
+      shared: 'Κοινοποιήθηκε η «{name}»',
+      public: 'Η «{name}» είναι πλέον δημόσια',
+    },
+    share: 'Κοινοποίηση…',
+    new: 'Νέα',
+    following: 'Ακολουθείται',
+    follow: 'Ακολούθηση',
+    unfollow: 'Διακοπή ακολούθησης',
+    followed: 'Ακολουθείς τη «{name}»',
+    unfollowed: 'Σταμάτησες να ακολουθείς τη «{name}»',
+    saveCopy: 'Αποθήκευση αντιγράφου',
+    copied: 'Το αντίγραφο αποθηκεύτηκε ως «{name}»',
+    open: 'Άνοιγμα',
+    detach: 'Αποσύνδεση από την πηγή',
+    detachTitle: 'Αποσύνδεση της «{name}» από την πηγή της;',
+    detachBody:
+      'Θα μπορείς να προσθέτεις και να αφαιρείς κομμάτια. Τα κομμάτια μένουν ως έχουν, αλλά το Downtify σταματά να κρατά τη λίστα συγχρονισμένη με το Spotify ή το YouTube Music και αφαιρεί την παρακολούθησή της, αν υπάρχει.',
+    detached: 'Η «{name}» μπορεί πλέον να επεξεργαστεί',
+    by: 'από {owner}',
+    sharedWithCount: {
+      one: 'Κοινή με {count} άτομο',
+      other: 'Κοινή με {count} άτομα',
+    },
+    sharedWithMe: 'Κοινοποιημένες σε μένα',
+    sharedWithMeHint:
+      'Λίστες που μοιράστηκαν μαζί σου άλλοι. Μπορείς να τις παίξεις, όχι να τις αλλάξεις.',
+    publicPlaylists: 'Δημόσιες λίστες',
+    publicPlaylistsHint:
+      'Κοινές για όλους σε αυτόν τον διακομιστή. Ακολούθησε μία για να μένει στην πλαϊνή στήλη.',
+    navTitle: 'Κοινοποιημένες σε εσένα',
+    showMore: 'Εμφάνιση {count} ακόμη',
+  },
   settings: {
     apps: 'Εφαρμογές',
     title: 'Ρυθμίσεις',
@@ -773,6 +916,13 @@ export default {
     showLyricsHint:
       'Απενεργοποιήστε για να κρυφτεί ο πίνακας στίχων, το κουμπί και η συντόμευσή του. Τα αρχεία σας κρατούν τους στίχους και οι λήψεις συνεχίζουν να τους ψάχνουν.',
     searchGroup: 'Αναζήτηση',
+    playlistsGroup: 'Λίστες',
+    showPublicPlaylists: 'Εμφάνιση δημόσιων λιστών',
+    showPublicPlaylistsHint:
+      'Εμφανίζει στη Βιβλιοθήκη τις δημόσιες λίστες των άλλων. Αυτές που ακολουθείς φαίνονται πάντα.',
+    allowPlaylistSharing: 'Να επιτρέπεται στους χρήστες η κοινοποίηση λιστών',
+    allowPlaylistSharingHint:
+      'Οι χρήστες μπορούν να μοιράζονται τις λίστες τους με άλλους ή να τις κάνουν δημόσιες. Όταν είναι ανενεργό, όλες οι κοινοποιημένες λίστες μένουν κρυφές μέχρι να το ενεργοποιήσεις ξανά.',
     searchAlbums: 'Εμφάνιση άλμπουμ στα αποτελέσματα',
     searchAlbumsHint:
       'Αναζήτηση και άλμπουμ, με επιλογή λήψης ολόκληρου του άλμπουμ.',
@@ -790,6 +940,16 @@ export default {
     sourceYtmHint: 'Καλύτερες αντιστοιχίες μεταδεδομένων',
     sourceYt: 'YouTube',
     sourceYtHint: 'Εναλλακτική για τραγούδια που λείπουν από το YouTube Music',
+    deemixTitle: 'Deemix',
+    deemixHint:
+      'Download from your own Deemix server. Requested quality requires the matching Deezer entitlement.',
+    deemixEnabled: 'Use Deemix',
+    deemixInPlace:
+      'Keep audio, artwork and lyrics in the shared Deemix folder, without rewriting its tags. Configure a private ARL file on the server; do not paste it here.',
+    deemixUrl: 'Deemix server URL',
+    deemixRemote: 'Download folder inside Deemix',
+    deemixLocal: 'Same folder inside Downtify (read-only is supported)',
+    deemixQuality: 'Audio quality',
     slskdTitle: 'slskd',
     slskdHint:
       'Λήψη από Soulseek μέσω του διακομιστή slskd. Όσα δεν βρεθούν περνούν στην επόμενη πηγή.',
@@ -900,6 +1060,10 @@ export default {
     navidromeAdminHint:
       'Προαιρετικό — επιτρέπει στο Downtify να ξεκινά σάρωση ώστε τα νέα τραγούδια να εμφανίζονται νωρίτερα.',
     test: {
+      connection_not_deemix: 'The server is not a compatible Deemix instance.',
+      quality_unavailable:
+        'The Deezer account cannot stream the requested quality.',
+
       button: 'Δοκιμή σύνδεσης',
       testing: 'Δοκιμή…',
       needFields: 'Συμπληρώστε πρώτα τα παραπάνω πεδία.',
@@ -943,6 +1107,9 @@ export default {
     navidromeSyncHint:
       'Μετά από λήψεις λιστών και ελέγχους, διατηρεί λίστα με το ίδιο όνομα στο Navidrome.',
     navidromePublic: 'Δημόσιες λίστες Navidrome',
+    primaryLibrary: 'Primary library folder',
+    primaryLibraryHint:
+      'Prefer this folder for matching artist, song and album. Files and saved playlist paths are preserved; nothing is deleted.',
     libraryGroup: 'Βιβλιοθήκη',
     coverCache: 'Προσωρινή μνήμη εξωφύλλων',
     coverCacheHint:
@@ -1049,6 +1216,7 @@ export default {
     lyrics: 'Στίχοι',
     queue: 'Επόμενα',
     search: 'Αναζήτηση',
+    findInPlaylist: 'Αναζήτηση στη λίστα (στη σελίδα της)',
     goLibrary: 'Μετάβαση στη βιβλιοθήκη',
     goQueue: 'Μετάβαση στην ουρά',
     close: 'Κλείσιμο αναπαραγωγής',
@@ -1195,6 +1363,32 @@ export default {
     later: 'Αργότερα',
     changePassword: 'Αλλαγή κωδικού',
   },
+  visibility: {
+    hide: 'Απόκρυψη από τους χρήστες',
+    show: 'Εμφάνιση στους χρήστες',
+    hiddenShort: 'Κρυφό',
+    hidden: {
+      one: 'Κρύφτηκε από τους χρήστες',
+      other: '{count} στοιχεία κρύφτηκαν από τους χρήστες',
+    },
+    shown: {
+      one: 'Εμφανίζεται στους χρήστες',
+      other: '{count} στοιχεία εμφανίζονται στους χρήστες',
+    },
+    hiddenBy: {
+      track: 'Κρυφό από τους χρήστες',
+      album: 'Κρυφό από τους χρήστες μαζί με το άλμπουμ του',
+      artist: 'Κρυφό από τους χρήστες μαζί με τον καλλιτέχνη του',
+    },
+    title: 'Κρυφά από τους χρήστες',
+    hint: 'Όλοι βλέπουν όλα τα τραγούδια που έχουν γίνει λήψη. Ό,τι κρύβετε εδώ δεν το βλέπουν οι χρήστες· οι διαχειριστές συνεχίζουν να τα βλέπουν όλα. Κρύψτε τραγούδια, άλμπουμ ή καλλιτέχνες από τη Βιβλιοθήκη.',
+    none: 'Δεν υπάρχει τίποτα κρυφό. Χρησιμοποιήστε το «Απόκρυψη από τους χρήστες» σε ένα τραγούδι, άλμπουμ ή καλλιτέχνη στη Βιβλιοθήκη.',
+    group: {
+      artists: 'Καλλιτέχνες',
+      albums: 'Άλμπουμ',
+      tracks: 'Τραγούδια',
+    },
+  },
   users: {
     title: 'Χρήστες',
     hint: 'Ποιος μπορεί να συνδεθεί σε αυτόν τον διακομιστή. Οι διαχειριστές αλλάζουν τα πάντα· οι χρήστες ακούνε, αναζητούν, κατεβάζουν και αλλάζουν τον δικό τους λογαριασμό.',
@@ -1262,6 +1456,8 @@ export default {
       unlike: 'Αφαιρέσεις «μου αρέσει»',
       delete: 'Διαγραμμένα αρχεία',
       audio_replaced: 'Αντικαταστάσεις ήχου',
+      library_hidden: 'Στοιχεία που κρύφτηκαν από τους χρήστες',
+      library_shown: 'Στοιχεία που εμφανίστηκαν στους χρήστες',
       device_paired: 'Συνδεδεμένες εφαρμογές',
       device_unpaired: 'Αποσυνδεδεμένες εφαρμογές',
       user_created: 'Νέοι χρήστες',
@@ -1280,6 +1476,8 @@ export default {
       unlike: 'αφαίρεσε το «μου αρέσει» από το {what}',
       delete: 'διέγραψε {what}',
       audio_replaced: 'αντικατέστησε τον ήχο του {what}',
+      library_hidden: 'έκρυψε το {what} από τους χρήστες',
+      library_shown: 'εμφάνισε το {what} στους χρήστες',
       device_paired: 'σύνδεσε {what}',
       device_unpaired: 'αποσύνδεσε {what}',
       user_created: 'πρόσθεσε τον χρήστη {what}',
@@ -1423,6 +1621,11 @@ export default {
     deleted: {
       one: 'Το κομμάτι διαγράφηκε',
       other: 'Διαγράφηκαν {count} κομμάτια',
+    },
+    releasedShared: {
+      one: '{count} τραγούδι παραμένει στην κοινή βιβλιοθήκη (το έχει κατεβάσει και κάποιος άλλος)',
+      other:
+        '{count} τραγούδια παραμένουν στην κοινή βιβλιοθήκη (τα έχουν κατεβάσει και άλλοι)',
     },
     deletePartial: {
       one: '{count} αρχείο δεν διαγράφηκε',

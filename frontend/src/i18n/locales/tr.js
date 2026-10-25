@@ -2,8 +2,51 @@ import recognition from '../recognition.js'
 
 export default {
   recognition,
+  playlistNames: { restore: 'Restore source name' },
+  playlistFavorites: {
+    title: 'Favori çalma listeleri',
+    add: 'Çalma listesini favorilere ekle',
+    remove: 'Çalma listesini favorilerden kaldır',
+  },
+  externalPlaylistImport: {
+    open: 'Import folder playlists',
+    title: 'Playlists in your music folders',
+    hint: 'Select the playlists to add, up to 50 at a time. Only available tracks are referenced. Source files and audio are never changed.',
+    loading: 'Looking for playlist files…',
+    empty: 'No M3U or M3U8 playlist files found in the added folders.',
+    counts:
+      '{count} available · {missing} unavailable · {duplicates} repeated entries',
+    existing: 'Already added as {name}',
+    preview: 'Preview the first 30 tracks',
+    truncated: 'The scan reached its limit; this list is incomplete.',
+    add: 'Add selected playlists ({count})',
+    result:
+      '{added} added · {existing} already present · {failed} need a new preview or could not be imported',
+  },
   language: {
     name: 'Türkçe',
+  },
+  buy: {
+    menu: 'Sanatçıyı destekle',
+    title: 'Sanatçıyı destekle',
+    body: 'Müziği satın al ya da sanatçının kendi web sitesini ziyaret et.',
+    inStore: 'Mağazada aç',
+    search: '“{query}” ara',
+    website: 'Resmî web sitesi',
+    failed: 'Mağazalarda aranamadı.',
+    note: 'Bandcamp her satışın büyük kısmını sanatçıya verir. Bunlar sıradan bağlantılardır: Downtify bir şey satmaz ve bunlardan kazanç elde etmez.',
+  },
+  playlistSearch: {
+    placeholder: 'Bu listede ara',
+    all: 'Tümü',
+    missing: 'Eksik',
+    failed: 'Başarısız',
+    notInNavidrome: 'Navidrome’da yok',
+    fromFolders: 'Klasörlerin',
+    unknownSource: 'Bilinmeyen kaynak',
+    showing: '{count} / {total}',
+    noMatch: 'Eşleşen bir şey yok',
+    noMatchHint: 'Başka kelimeler ya da başka bir filtre dene.',
   },
   common: {
     cancel: 'İptal',
@@ -17,6 +60,7 @@ export default {
     seeAll: 'Tümünü gör',
     show: 'Göster',
     hide: 'Gizle',
+    undo: 'Geri al',
     unknownArtist: 'Bilinmeyen sanatçı',
     tracks: { one: '{count} parça', other: '{count} parça' },
     albums: { one: '{count} albüm', other: '{count} albüm' },
@@ -224,6 +268,11 @@ export default {
     downloadNew: { one: '{count} yeniyi indir', other: '{count} yeniyi indir' },
     redownloadAll: 'Tümünü yeniden indir',
     downloadSelected: 'Seçilenleri indir',
+    allHandled: 'Zaten kitaplığınızda veya kuyrukta',
+    addPlaylist: 'Çalma listelerime ekle',
+    noAvailableTracks: 'Henüz eklenebilecek indirilmiş parça yok.',
+    saveAvailableHint:
+      '{total} parçadan {count} tanesi kullanılabilir. Mevcut ses dosyaları kullanılır; eksik parçalar indirilmez.',
     allInLibrary: 'Hepsi kitaplığında',
     watchPlaylist: 'Yeni parçaları izle',
     watchArtist: 'Yeni yayınları izle',
@@ -306,6 +355,19 @@ export default {
     sortArtist: 'Sanatçı',
     sortYear: 'Yıl',
     sortTrackCount: 'Parça sayısı',
+    trackSort: {
+      order: 'Çalma listesi sırası',
+      addedNew: 'Son eklenenler',
+      addedOld: 'İlk eklenenler',
+      titleAsc: 'Başlık (A–Z)',
+      titleDesc: 'Başlık (Z–A)',
+      artistAsc: 'Sanatçı (A–Z)',
+      artistDesc: 'Sanatçı (Z–A)',
+      albumAsc: 'Albüm (A–Z)',
+      albumDesc: 'Albüm (Z–A)',
+      longest: 'Önce en uzun',
+      shortest: 'Önce en kısa',
+    },
     viewGrid: 'Izgara',
     viewList: 'Liste',
     emptyTitle: 'Kitaplığın boş',
@@ -344,6 +406,28 @@ export default {
     failed: 'Beğeni güncellenemedi',
   },
   upgrade: {
+    chooseRecording: 'Choose a Deezer recording',
+    chooseRecordingHint:
+      'Review an exact recording when old album tags do not match. The artist and full title must still match.',
+    recordingLink: 'Deezer track link',
+    previewRecording: 'Preview',
+    recordingReviewHint:
+      'Review the album and duration. This prepares a single-track scan; replacement starts only after you confirm the scan.',
+    analyzeRecording: 'Analyze this choice',
+    recordingPreviewFailed: 'Unable to preview this Deezer track.',
+    replacementRescan: 'Options changed: scan again before starting.',
+    deemixTitle: 'Replace recordings with Deemix',
+    replaceAudio: 'Use verified Deemix recordings',
+    replaceAudioHint:
+      'Match the exact artist, title and album. Keep music in the Deemix folder. Ambiguous matches leave originals untouched. This scan replaces audio instead of retagging it.',
+    deleteOriginals: 'Remove old Downtify audio after import',
+    deleteOriginalsHint:
+      'Only remove each verified original after playlists, likes and playback references are updated. External files and sidecars are never removed.',
+    replacementProgress:
+      'Awaiting publication or cleanup: {pending}. Old copies removed: {removed}. Originals kept: {kept}.',
+    audio: 'Deemix recordings',
+    audioHint:
+      'Verify catalog duration and decoded audio before updating playlists and removing an old copy.',
     title: 'Kitaplığı iyileştir',
     subtitle:
       'Zaten indirdiğiniz müzikleri yeniden indirmek yerine iyileştirin.',
@@ -537,6 +621,19 @@ export default {
     },
     alreadyIn: 'Zaten “{name}” içinde',
     removedTrack: '“{name}” listesinden çıkarıldı',
+    hideTrack: 'Listeden gizle',
+    hiddenTrack: '“{name}” listesinden gizlendi',
+    hiddenTitle: {
+      one: '{count} gizli şarkı',
+      other: '{count} gizli şarkı',
+    },
+    hiddenHint:
+      'Bu listeden gizlediğin şarkılar. Liste kaynağıyla eşitlendiğinde dışarıda kalır ve kitaplığında durmaya devam eder.',
+    hiddenGone: 'Artık kitaplığında değil',
+    unhide: 'Tekrar göster',
+    unhidden: '“{name}” listesine geri döndü',
+    unhiddenLater:
+      'Liste eksiklerini indirdiğinde “{name}” listesine geri döner',
     created: '“{name}” oluşturuldu',
     rename: 'Yeniden adlandır',
     renameTitle: 'Çalma listesini yeniden adlandır',
@@ -737,6 +834,52 @@ export default {
     saved: 'İzleme güncellendi',
     retargeted: 'Artık {name} izleniyor',
   },
+  sharing: {
+    title: '“{name}” paylaş',
+    hint: 'Paylaştığın kişiler listeyi çalabilir, takip edebilir ve kopyasını kaydedebilir; ama değiştiremez.',
+    private: 'Özel',
+    privateHint: 'Yalnızca sen görebilirsin.',
+    shared: 'Belirli kişiler',
+    sharedHint: 'Kimlerin görebileceğini seç.',
+    public: 'Herkese açık',
+    publicHint: 'Bu sunucudaki herkes görebilir.',
+    noOtherUsers: 'Paylaşılacak başka hesap yok.',
+    findUser: 'Kişi bul',
+    loadingUsers: 'Kişiler yükleniyor…',
+    saved: {
+      private: '“{name}” yine özel',
+      shared: '“{name}” paylaşıldı',
+      public: '“{name}” artık herkese açık',
+    },
+    share: 'Paylaş…',
+    new: 'Yeni',
+    following: 'Takip ediliyor',
+    follow: 'Takip et',
+    unfollow: 'Takibi bırak',
+    followed: '“{name}” takip ediliyor',
+    unfollowed: '“{name}” takibi bırakıldı',
+    saveCopy: 'Kopyasını kaydet',
+    copied: 'Kopya “{name}” olarak kaydedildi',
+    open: 'Aç',
+    detach: 'Kaynaktan ayır',
+    detachTitle: '“{name}” kaynağından ayrılsın mı?',
+    detachBody:
+      'Şarkı ekleyip çıkarabilirsin. Şarkılar olduğu gibi kalır, ancak Downtify listeyi Spotify veya YouTube Music ile eşit tutmayı bırakır ve varsa izlemesini kaldırır.',
+    detached: '“{name}” artık düzenlenebilir',
+    by: '{owner} tarafından',
+    sharedWithCount: {
+      one: '{count} kişiyle paylaşıldı',
+      other: '{count} kişiyle paylaşıldı',
+    },
+    sharedWithMe: 'Benimle paylaşılanlar',
+    sharedWithMeHint:
+      'Başkalarının seninle paylaştığı listeler. Çalabilirsin ama değiştiremezsin.',
+    publicPlaylists: 'Herkese açık listeler',
+    publicPlaylistsHint:
+      'Bu sunucudaki herkesle paylaşılır. Kenar çubuğunda tutmak için birini takip et.',
+    navTitle: 'Seninle paylaşılanlar',
+    showMore: '{count} tane daha göster',
+  },
   settings: {
     apps: 'Uygulamalar',
     title: 'Ayarlar',
@@ -770,6 +913,13 @@ export default {
     showLyricsHint:
       'Şarkı sözü panelini, düğmesini ve kısayolunu gizlemek için kapatın. Dosyalarınız sözlerini korur ve indirmeler onları getirmeye devam eder.',
     searchGroup: 'Arama',
+    playlistsGroup: 'Çalma listeleri',
+    showPublicPlaylists: 'Herkese açık listeleri göster',
+    showPublicPlaylistsHint:
+      'Başkalarının herkese açık listelerini Kitaplık’ta gösterir. Takip ettiklerin her zaman görünür.',
+    allowPlaylistSharing: 'Kullanıcıların liste paylaşmasına izin ver',
+    allowPlaylistSharingHint:
+      'Kullanıcılar listelerini başkalarıyla paylaşabilir veya herkese açık yapabilir. Kapalıyken paylaşılan tüm listeler, yeniden açana kadar gizli kalır.',
     searchAlbums: 'Arama sonuçlarında albümleri göster',
     searchAlbumsHint:
       'Aramada albümleri de getir ve albümün tamamını indirme seçeneği sun.',
@@ -787,6 +937,16 @@ export default {
     sourceYtmHint: 'En iyi meta veri eşleşmeleri',
     sourceYt: 'YouTube',
     sourceYtHint: 'YouTube Music’te olmayan şarkılar için yedek',
+    deemixTitle: 'Deemix',
+    deemixHint:
+      'Download from your own Deemix server. Requested quality requires the matching Deezer entitlement.',
+    deemixEnabled: 'Use Deemix',
+    deemixInPlace:
+      'Keep audio, artwork and lyrics in the shared Deemix folder, without rewriting its tags. Configure a private ARL file on the server; do not paste it here.',
+    deemixUrl: 'Deemix server URL',
+    deemixRemote: 'Download folder inside Deemix',
+    deemixLocal: 'Same folder inside Downtify (read-only is supported)',
+    deemixQuality: 'Audio quality',
     slskdTitle: 'slskd',
     slskdHint:
       'Soulseek’ten slskd sunucun üzerinden indir. Bulunamayan parçalar sonraki kaynağa geçer.',
@@ -893,6 +1053,10 @@ export default {
     navidromeAdminHint:
       'İsteğe bağlı — yeni şarkıların daha çabuk görünmesi için Downtify’ın tarama başlatmasını sağlar.',
     test: {
+      connection_not_deemix: 'The server is not a compatible Deemix instance.',
+      quality_unavailable:
+        'The Deezer account cannot stream the requested quality.',
+
       button: 'Bağlantıyı sına',
       testing: 'Sınanıyor…',
       needFields: 'Önce yukarıdaki alanları doldurun.',
@@ -933,6 +1097,9 @@ export default {
     navidromeSyncHint:
       'Çalma listesi indirmeleri ve izleyici kontrollerinden sonra Navidrome’da aynı adlı bir liste tut.',
     navidromePublic: 'Navidrome çalma listelerini herkese açık yap',
+    primaryLibrary: 'Primary library folder',
+    primaryLibraryHint:
+      'Prefer this folder for matching artist, song and album. Files and saved playlist paths are preserved; nothing is deleted.',
     libraryGroup: 'Kitaplık',
     coverCache: 'Kapakları önbelleğe al',
     coverCacheHint:
@@ -1037,6 +1204,7 @@ export default {
     lyrics: 'Şarkı sözleri',
     queue: 'Sıradaki',
     search: 'Ara',
+    findInPlaylist: 'Listede ara (liste sayfasında)',
     goLibrary: 'Kitaplığa git',
     goQueue: 'Kuyruğa git',
     close: 'Şimdi çalanı kapat',
@@ -1179,6 +1347,32 @@ export default {
     later: 'Sonra',
     changePassword: 'Parolayı değiştir',
   },
+  visibility: {
+    hide: 'Kullanıcılardan gizle',
+    show: 'Kullanıcılara göster',
+    hiddenShort: 'Gizli',
+    hidden: {
+      one: 'Kullanıcılardan gizlendi',
+      other: '{count} öğe kullanıcılardan gizlendi',
+    },
+    shown: {
+      one: 'Kullanıcılara gösterildi',
+      other: '{count} öğe kullanıcılara gösterildi',
+    },
+    hiddenBy: {
+      track: 'Kullanıcılardan gizli',
+      album: 'Albümüyle birlikte kullanıcılardan gizli',
+      artist: 'Sanatçısıyla birlikte kullanıcılardan gizli',
+    },
+    title: 'Kullanıcılardan gizlenenler',
+    hint: 'Herkes indirilen tüm şarkıları görür. Burada gizlediğiniz öğeleri kullanıcılar görmez; yöneticiler her şeyi görmeye devam eder. Şarkıları, albümleri veya sanatçıları Kitaplık’tan gizleyin.',
+    none: 'Hiçbir şey gizli değil. Kitaplık’ta bir şarkıda, albümde veya sanatçıda “Kullanıcılardan gizle”yi kullanın.',
+    group: {
+      artists: 'Sanatçılar',
+      albums: 'Albümler',
+      tracks: 'Şarkılar',
+    },
+  },
   users: {
     title: 'Kullanıcılar',
     hint: 'Bu sunucuya kimlerin giriş yapabileceği. Yöneticiler her şeyi değiştirebilir; kullanıcılar dinleyebilir, arayabilir, indirebilir ve kendi hesaplarını değiştirebilir.',
@@ -1249,6 +1443,8 @@ export default {
       unlike: 'Kaldırılan beğeniler',
       delete: 'Silinen dosyalar',
       audio_replaced: 'Değiştirilen sesler',
+      library_hidden: 'Kullanıcılardan gizlenen öğeler',
+      library_shown: 'Kullanıcılara gösterilen öğeler',
       device_paired: 'Eşlenen uygulamalar',
       device_unpaired: 'Eşleşmesi kaldırılan uygulamalar',
       user_created: 'Eklenen kullanıcılar',
@@ -1267,6 +1463,8 @@ export default {
       unlike: 'beğeniyi kaldırdı: {what}',
       delete: 'sildi: {what}',
       audio_replaced: 'şunun sesini değiştirdi: {what}',
+      library_hidden: '{what} öğesini kullanıcılardan gizledi',
+      library_shown: '{what} öğesini kullanıcılara gösterdi',
       device_paired: 'eşledi: {what}',
       device_unpaired: 'eşleşmeyi kaldırdı: {what}',
       user_created: 'kullanıcı ekledi: {what}',
@@ -1408,6 +1606,11 @@ export default {
       other: '{count} parça kuyruğa eklendi',
     },
     deleted: { one: 'Parça silindi', other: '{count} parça silindi' },
+    releasedShared: {
+      one: '{count} şarkı paylaşılan kitaplıkta kalıyor (başkası da indirmiş)',
+      other:
+        '{count} şarkı paylaşılan kitaplıkta kalıyor (başkaları da indirmiş)',
+    },
     deletePartial: {
       one: '{count} dosya silinemedi',
       other: '{count} dosya silinemedi',
